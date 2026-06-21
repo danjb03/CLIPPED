@@ -1,7 +1,6 @@
 """Clip Engine — FastAPI worker.
 
-Implemented: /health, /ingest, /transcribe (Phase 1). The remaining routes are
-honest stubs filled in during their phase.
+Routes: /health, /ingest, /transcribe, /select, /render, /copy, /export.
 """
 
 import subprocess
@@ -12,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import clipselect as select_mod
+import copygen as copy_mod
+import exporter as export_mod
 import ingest as ingest_mod
 import render as render_mod
 import transcribe as transcribe_mod
@@ -36,9 +37,6 @@ def health():
     return {"ok": True}
 
 
-# --- Stubs for later phases (declared now so the API shape is stable) ---
-
-
 class IngestRequest(BaseModel):
     url: str
 
@@ -50,10 +48,6 @@ class JobRequest(BaseModel):
 class SelectRequest(BaseModel):
     job_id: str
     count: int = 3
-
-
-def _not_implemented(phase: str):
-    raise HTTPException(status_code=501, detail=f"Not implemented yet — {phase}.")
 
 
 @app.post("/ingest")
@@ -107,5 +101,22 @@ def render(req: JobRequest):
 
 
 @app.post("/copy")
-def copy(_: JobRequest):
-    _not_implemented("Phase 6: Claude copy generation")
+def copy(req: JobRequest):
+    try:
+        path = copy_mod.generate_copy(req.job_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"job_id": req.job_id, "clips": path}
+
+
+@app.post("/export")
+def export(req: JobRequest):
+    try:
+        path = export_mod.export(req.job_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"job_id": req.job_id, "export": path}

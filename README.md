@@ -31,9 +31,11 @@ This repo is being built phase-by-phase per the PRD. **Current status: Phase 1 �
 │  ├─ transcribe.py # faster-whisper + pyannote -> transcript.json
 │  ├─ clipselect.py # Claude clip selection -> clips.json
 │  ├─ render.py     # ffmpeg crop + Remotion caption render -> renders/*.mp4
-│  ├─ copygen.py / split.py  # later phases. clipselect/copygen are renamed
-│  │                          from select/copy to avoid shadowing stdlib modules.
-│  └─ tests/        # unit tests (alignment, selection, render helpers)
+│  ├─ copygen.py    # Claude per-clip post copy -> clips.json
+│  ├─ exporter.py   # zip renders/*.mp4 + captions.txt -> export.zip
+│  ├─ split.py      # Phase 4 (split-screen). clipselect/copygen are renamed
+│  │                  from select/copy to avoid shadowing stdlib modules.
+│  └─ tests/        # unit tests (alignment, selection, render, export)
 ├─ web/
 │  └─ remotion/     # Captions composition (word-synced, styled)
 └─ output/     # generated artifacts, one folder per job (git-ignored)
@@ -149,6 +151,22 @@ yellow active-word highlight) is a `style` object — `fontFamily, fontSize, col
 strokeColor, strokeWidth, highlightColor, maxWidth, position{x,y}` (x/y as 0..1
 fractions). Defaults live in `worker/render.py` and `web/remotion/types.ts`.
 
+## Phase 6 usage
+
+```bash
+# generate post copy per clip (needs ANTHROPIC_API_KEY)
+curl -s -XPOST localhost:8000/copy -H 'content-type: application/json' \
+  -d '{"job_id":"abc123..."}'
+# -> adds a "copy" field to each clip in clips.json
+
+# bundle everything for posting
+curl -s -XPOST localhost:8000/export -H 'content-type: application/json' \
+  -d '{"job_id":"abc123..."}'
+# -> output/<job_id>/export.zip  (renders/clip_N.mp4 + captions.txt)
+```
+
+The copy prompt in `copygen.py` is a generic placeholder — swap in your own.
+
 ## Tests
 
 ```bash
@@ -156,6 +174,7 @@ cd worker
 python tests/test_transcribe.py   # speaker-alignment logic (no models)
 python tests/test_select.py       # clip selection: snapping, validation, JSON
 python tests/test_render.py       # render helpers: word-slicing, ffmpeg cmd
+python tests/test_export.py       # copy attach (stubbed Claude) + export zip
 ```
 
 ## Acceptance tests
@@ -169,6 +188,8 @@ python tests/test_render.py       # render helpers: word-slicing, ffmpeg cmd
   `ANTHROPIC_API_KEY`.)
 - **Phase 3:** rendering a segment produces a 1080×1920 mp4 with readable captions
   in sync with speech for the full clip.
+- **Phase 6:** `export.zip` contains every rendered clip and a `captions.txt` with
+  matching copy per clip. (Copy generation requires `ANTHROPIC_API_KEY`.)
 
 ## Roadmap
 
@@ -176,8 +197,10 @@ python tests/test_render.py       # render helpers: word-slicing, ffmpeg cmd
 - **Phase 1 — Ingest + transcribe** ✅ (yt-dlp + faster-whisper + pyannote)
 - **Phase 2 — Clip selection** ✅ (Claude)
 - **Phase 3 — Vertical captioned render** ✅ (Remotion + ffmpeg)
+- **Phase 6 — Copy generation + export** ✅ (Claude + zip)
 - Phase 4 — Split-screen mode (static face stack)
 - Phase 5 — Local control UI
-- Phase 6 — Copy generation + export
 
-Phases 0 → 1 → 2 → 3 → 6 give a finished, usable tool with none of the hard ML.
+Phases 0 → 1 → 2 → 3 → 6 are done: a finished, usable tool (captioned
+single-speaker clips + post copy) with none of the hard ML. Phases 4–5 are
+upgrades on top.
