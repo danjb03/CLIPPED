@@ -45,5 +45,10 @@ def export(job_id: str) -> str:
             p = jd / extra
             if p.exists():
                 z.write(p, arcname=extra)
+        # rendered carousel slide images, if any
+        carousels_dir = jd / "carousels"
+        if carousels_dir.exists():
+            for png in sorted(carousels_dir.rglob("*.png")):
+                z.write(png, arcname=f"carousels/{png.relative_to(carousels_dir)}")
 
     return str(zip_path)

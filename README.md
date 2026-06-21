@@ -180,9 +180,17 @@ curl -s -XPOST localhost:8000/carousels -H 'content-type: application/json' \
 # -> output/<job_id>/carousels.json (structured) + carousels.txt (postable)
 ```
 
-`carousels.txt` / `carousels.json` are also added to `export.zip` when present.
-Note: speaker labels in the transcript are `A`/`B`, not real names, so the model
-can't reliably attribute lines to "Neil" specifically.
+Render the carousels as post-ready image slides (1080×1350 PNGs):
+
+```bash
+curl -s -XPOST localhost:8000/carousels/render -H 'content-type: application/json' \
+  -d '{"job_id":"abc123..."}'
+# -> output/<job_id>/carousels/carousel_<n>/slide_<i>.png
+```
+
+`carousels.txt` / `carousels.json` and the rendered slide PNGs are added to
+`export.zip` when present. Note: speaker labels in the transcript are `A`/`B`, not
+real names, so the model can't reliably attribute lines to "Neil" specifically.
 
 ## Tests
 

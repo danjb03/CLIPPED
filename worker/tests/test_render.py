@@ -3,12 +3,22 @@
 Run from worker/:  python tests/test_render.py
 """
 
+import json
 import os
+import pathlib
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from render import build_ffmpeg_cmd, build_props, slice_words  # noqa: E402
+import paths  # noqa: E402
+import render  # noqa: E402
+from render import (  # noqa: E402
+    build_carousel_props,
+    build_ffmpeg_cmd,
+    build_props,
+    slice_words,
+)
 
 
 def _words():
@@ -49,6 +59,37 @@ def test_build_props_shape():
     assert props["durationInSeconds"] == 30.0
     assert "fps" in props and props["style"]["fontSize"] == 84
     assert isinstance(props["words"], list)
+
+
+def test_build_carousel_props_merges_style():
+    props = build_carousel_props("hi there", 2, 4, {"accent": "#fff", "color": "#000"})
+    assert props["text"] == "hi there"
+    assert props["index"] == 2 and props["total"] == 4
+    assert props["accent"] == "#fff"
+
+
+def test_render_carousels_writes_one_png_per_slide():
+    tmp = tempfile.mkdtemp()
+    paths.OUTPUT_DIR = pathlib.Path(tmp)
+    job = "jobr"
+    jd = paths.job_dir(job)
+    jd.mkdir(parents=True)
+    (jd / "carousels.json").write_text(
+        json.dumps(
+            [
+                {"number": 1, "title": "t", "slides": ["a", "b", "c", "d"]},
+                {"number": 2, "title": "u", "slides": ["e", "f"]},
+            ]
+        )
+    )
+    # stub the actual Remotion still render: just create the output file
+    render._remotion_still = lambda props_file, out: pathlib.Path(out).write_bytes(b"png")
+    out = render.render_carousels(job)
+    assert len(out) == 6  # 4 + 2 slides
+    assert (jd / "carousels" / "carousel_1" / "slide_1.png").exists()
+    assert (jd / "carousels" / "carousel_2" / "slide_2.png").exists()
+    # props temp files cleaned up
+    assert not list((jd / "carousels" / "carousel_1").glob(".props_*.json"))
 
 
 if __name__ == "__main__":

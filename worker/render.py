@@ -36,6 +36,13 @@ DEFAULT_STYLE: Dict[str, Any] = {
     "position": {"x": 0.5, "y": 0.78},
 }
 
+DEFAULT_CAROUSEL_STYLE: Dict[str, Any] = {
+    "background": "#111317",
+    "color": "#ffffff",
+    "accent": "#ffe600",
+    "fontFamily": "Inter, Arial, sans-serif",
+}
+
 
 # --- Pure, testable helpers (no ffmpeg, no Remotion) ---
 
@@ -86,6 +93,12 @@ def build_props(
     }
 
 
+def build_carousel_props(
+    text: str, index: int, total: int, style: Dict[str, Any]
+) -> Dict[str, Any]:
+    return {"text": text, "index": index, "total": total, **style}
+
+
 # --- ffmpeg + Remotion orchestration ---
 
 
@@ -100,6 +113,17 @@ def _remotion_render(props_file, out) -> None:
     cmd = [
         "npx", "remotion", "render",
         "remotion/index.ts", "Captions",
+        str(out),
+        f"--props={props_file}",
+        "--log=error",
+    ]
+    subprocess.run(cmd, check=True, cwd=str(WEB_DIR), capture_output=True, text=True)
+
+
+def _remotion_still(props_file, out) -> None:
+    cmd = [
+        "npx", "remotion", "still",
+        "remotion/index.ts", "CarouselSlide",
         str(out),
         f"--props={props_file}",
         "--log=error",
@@ -146,5 +170,37 @@ def render(job_id: str, style: Dict[str, Any] | None = None) -> List[str]:
             for tmp in (base_path, props_file):
                 if tmp.exists():
                     tmp.unlink()
+
+    return outputs
+
+
+def render_carousels(job_id: str, style: Dict[str, Any] | None = None) -> List[str]:
+    """Render each carousel slide to a PNG under output/<job_id>/carousels/."""
+    cjson = job_dir(job_id) / "carousels.json"
+    if not cjson.exists():
+        raise FileNotFoundError(f"carousels.json not found for job {job_id}")
+
+    carousels = json.loads(cjson.read_text())
+    style = {**DEFAULT_CAROUSEL_STYLE, **(style or {})}
+    base_out = job_dir(job_id) / "carousels"
+    base_out.mkdir(parents=True, exist_ok=True)
+
+    outputs: List[str] = []
+    for c in carousels:
+        number = c.get("number", len(outputs) + 1)
+        slides = c.get("slides", [])
+        cdir = base_out / f"carousel_{number}"
+        cdir.mkdir(parents=True, exist_ok=True)
+        for i, text in enumerate(slides, start=1):
+            out_png = cdir / f"slide_{i}.png"
+            props_file = cdir / f".props_{i}.json"
+            try:
+                props = build_carousel_props(text, i, len(slides), style)
+                props_file.write_text(json.dumps(props))
+                _remotion_still(props_file, out_png)
+                outputs.append(str(out_png))
+            finally:
+                if props_file.exists():
+                    props_file.unlink()
 
     return outputs

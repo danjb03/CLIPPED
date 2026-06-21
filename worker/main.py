@@ -129,6 +129,19 @@ def carousels(req: JobRequest):
     return {"job_id": req.job_id, "carousels": path}
 
 
+@app.post("/carousels/render")
+def render_carousels(req: JobRequest):
+    try:
+        outputs = render_mod.render_carousels(req.job_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=e.stderr or str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"job_id": req.job_id, "slides": outputs}
+
+
 @app.post("/export")
 def export(req: JobRequest):
     try:
