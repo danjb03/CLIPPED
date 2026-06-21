@@ -30,9 +30,12 @@ This repo is being built phase-by-phase per the PRD. **Current status: Phase 1 �
 │  ├─ ingest.py     # yt-dlp download
 │  ├─ transcribe.py # faster-whisper + pyannote -> transcript.json
 │  ├─ clipselect.py # Claude clip selection -> clips.json
+│  ├─ render.py     # ffmpeg crop + Remotion caption render -> renders/*.mp4
 │  ├─ copygen.py / split.py  # later phases. clipselect/copygen are renamed
 │  │                          from select/copy to avoid shadowing stdlib modules.
-│  └─ tests/        # unit tests for the speaker-alignment logic
+│  └─ tests/        # unit tests (alignment, selection, render helpers)
+├─ web/
+│  └─ remotion/     # Captions composition (word-synced, styled)
 └─ output/     # generated artifacts, one folder per job (git-ignored)
 ```
 
@@ -125,12 +128,34 @@ video duration, and nudged to 15-60s. Model via `ANTHROPIC_MODEL` (default
 `claude-sonnet-4-6`). The selection prompt in `clipselect.py` is a generic
 placeholder — swap in your own.
 
+## Phase 3 usage
+
+```bash
+# render every clip in clips.json to a 9:16 captioned mp4
+curl -s -XPOST localhost:8000/render -H 'content-type: application/json' \
+  -d '{"job_id":"abc123..."}'
+# -> output/<job_id>/renders/clip_0.mp4, clip_1.mp4, ...
+```
+
+For each clip the worker (1) trims `source.mp4` to `[start, end]` and centre-crops
+/ scales to **1080×1920**, (2) slices the segment's words and re-bases them to
+clip-relative time, (3) drives the Remotion `Captions` composition to burn
+word-synced captions. The cropped clip is staged under `web/public/clips/` (so
+`staticFile()` can load it) and removed afterwards. Requires `web/` deps installed
+(`npm install`) and `ffmpeg` on PATH.
+
+Caption style (defaults baked in: bold white, dark stroke, centred lower-third,
+yellow active-word highlight) is a `style` object — `fontFamily, fontSize, color,
+strokeColor, strokeWidth, highlightColor, maxWidth, position{x,y}` (x/y as 0..1
+fractions). Defaults live in `worker/render.py` and `web/remotion/types.ts`.
+
 ## Tests
 
 ```bash
 cd worker
 python tests/test_transcribe.py   # speaker-alignment logic (no models)
 python tests/test_select.py       # clip selection: snapping, validation, JSON
+python tests/test_render.py       # render helpers: word-slicing, ffmpeg cmd
 ```
 
 ## Acceptance tests
@@ -142,13 +167,15 @@ python tests/test_select.py       # clip selection: snapping, validation, JSON
 - **Phase 2:** `clips.json` has exactly `count` segments, each within the video
   duration, each starting on a word boundary, valid JSON. (Requires
   `ANTHROPIC_API_KEY`.)
+- **Phase 3:** rendering a segment produces a 1080×1920 mp4 with readable captions
+  in sync with speech for the full clip.
 
 ## Roadmap
 
 - **Phase 0 — Scaffold** ✅
 - **Phase 1 — Ingest + transcribe** ✅ (yt-dlp + faster-whisper + pyannote)
 - **Phase 2 — Clip selection** ✅ (Claude)
-- Phase 3 — Vertical captioned render (Remotion + ffmpeg)
+- **Phase 3 — Vertical captioned render** ✅ (Remotion + ffmpeg)
 - Phase 4 — Split-screen mode (static face stack)
 - Phase 5 — Local control UI
 - Phase 6 — Copy generation + export

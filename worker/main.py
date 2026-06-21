@@ -4,6 +4,8 @@ Implemented: /health, /ingest, /transcribe (Phase 1). The remaining routes are
 honest stubs filled in during their phase.
 """
 
+import subprocess
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +13,7 @@ from pydantic import BaseModel
 
 import clipselect as select_mod
 import ingest as ingest_mod
+import render as render_mod
 import transcribe as transcribe_mod
 from paths import REPO_ROOT
 
@@ -91,8 +94,16 @@ def select(req: SelectRequest):
 
 
 @app.post("/render")
-def render(_: JobRequest):
-    _not_implemented("Phase 3: ffmpeg + Remotion render")
+def render(req: JobRequest):
+    try:
+        outputs = render_mod.render(req.job_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=e.stderr or str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"job_id": req.job_id, "renders": outputs}
 
 
 @app.post("/copy")

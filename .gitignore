@@ -6,6 +6,10 @@
 output/*
 !output/.gitkeep
 
+# clips staged for Remotion render
+web/public/clips/*
+!web/public/clips/.gitkeep
+
 # node
 node_modules/
 .next/
