@@ -215,8 +215,9 @@ curl -s -XPOST localhost:8000/carousels/render -H 'content-type: application/jso
 ```
 
 `carousels.txt` / `carousels.json` and the rendered slide PNGs are added to
-`export.zip` when present. Note: speaker labels in the transcript are `A`/`B`, not
-real names, so the model can't reliably attribute lines to "Neil" specifically.
+`export.zip` when present. The creator speaker (relabelled "Neil" for the prompt)
+is auto-detected as the dominant speaker, or set it via the **Creator** dropdown
+in the UI / the `creator` field on `/carousels`.
 
 ## Tests
 
@@ -228,6 +229,16 @@ python tests/test_render.py       # render helpers: word-slicing, ffmpeg cmd
 python tests/test_export.py       # copy attach (stubbed Claude) + export zip
 python tests/test_carousel.py     # carousel parsing + generate + export
 python tests/test_split.py        # split-screen: clustering, crop, stack, fallback
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the worker unit tests and the
+web build on every push/PR.
+
+End-to-end smoke test against a running worker (needs ffmpeg/yt-dlp + keys):
+
+```bash
+scripts/smoke.sh "https://www.youtube.com/watch?v=..." 2
+# runs ingest -> ... -> export and prints output/<job_id>/
 ```
 
 ## Acceptance tests

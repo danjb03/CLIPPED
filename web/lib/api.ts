@@ -105,8 +105,11 @@ export const api = {
   regenerate: (jobId: string, index: number) =>
     post<{ clip: Clip }>("/select/regenerate", { job_id: jobId, index }),
   copy: (jobId: string) => post<{ clips: string }>("/copy", { job_id: jobId }),
-  carousels: (jobId: string) =>
-    post<{ carousels: string }>("/carousels", { job_id: jobId }),
+  carousels: (jobId: string, creator?: string) =>
+    post<{ carousels: string }>("/carousels", {
+      job_id: jobId,
+      creator: creator || null,
+    }),
   renderCarousels: (jobId: string) =>
     post<{ slides: string[] }>("/carousels/render", { job_id: jobId }),
   exportZip: (jobId: string) =>

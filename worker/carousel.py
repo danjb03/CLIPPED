@@ -50,21 +50,51 @@ Do not repeat the same idea across carousels. Each one should feel like a standa
 # --- Pure, testable helpers (no API, no IO) ---
 
 
-def transcript_plaintext(words: List[Dict[str, Any]]) -> str:
-    """Speaker-labelled transcript text (no timestamps) for the prompt."""
+def transcript_plaintext(
+    words: List[Dict[str, Any]], name_map: Dict[str, str] | None = None
+) -> str:
+    """Speaker-labelled transcript text (no timestamps) for the prompt.
+
+    name_map optionally renames raw speaker labels (e.g. {"A": "Neil"}).
+    """
+    name_map = name_map or {}
     lines: List[str] = []
     buf: List[str] = []
     speaker = ""
     for w in words:
         if buf and str(w["speaker"]) != speaker:
-            lines.append(f"{speaker}: {' '.join(buf)}")
+            lines.append(f"{name_map.get(speaker, speaker)}: {' '.join(buf)}")
             buf = []
         if not buf:
             speaker = str(w["speaker"])
         buf.append(str(w["word"]))
     if buf:
-        lines.append(f"{speaker}: {' '.join(buf)}")
+        lines.append(f"{name_map.get(speaker, speaker)}: {' '.join(buf)}")
     return "\n".join(lines)
+
+
+def dominant_speaker(words: List[Dict[str, Any]]) -> str:
+    """The speaker label with the most words (assumed to be the creator)."""
+    counts: Dict[str, int] = {}
+    for w in words:
+        counts[str(w["speaker"])] = counts.get(str(w["speaker"]), 0) + 1
+    return max(counts, key=lambda k: counts[k]) if counts else "A"
+
+
+def build_name_map(words: List[Dict[str, Any]], creator: str) -> Dict[str, str]:
+    """Map the creator label -> 'Neil'; the sole other speaker -> 'Guest'."""
+    labels = []
+    for w in words:
+        if str(w["speaker"]) not in labels:
+            labels.append(str(w["speaker"]))
+    others = [l for l in labels if l != creator]
+    name_map = {creator: "Neil"}
+    if len(others) == 1:
+        name_map[others[0]] = "Guest"
+    else:
+        for l in others:
+            name_map[l] = f"Speaker {l}"
+    return name_map
 
 
 def parse_carousels(text: str) -> List[Dict[str, Any]]:
@@ -114,8 +144,12 @@ def _ask_claude(transcript_text: str) -> str:
     return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
 
 
-def generate(job_id: str) -> str:
-    """Generate carousels from transcript.json; write carousels.json + .txt."""
+def generate(job_id: str, creator: str | None = None) -> str:
+    """Generate carousels from transcript.json; write carousels.json + .txt.
+
+    creator: which speaker label is the creator (relabelled 'Neil'). Defaults to
+    the dominant speaker.
+    """
     tpath = transcript_path(job_id)
     if not tpath.exists():
         raise FileNotFoundError(f"transcript.json not found for job {job_id}")
@@ -123,7 +157,8 @@ def generate(job_id: str) -> str:
     if not words:
         raise ValueError("transcript is empty")
 
-    transcript_text = transcript_plaintext(words)
+    creator = creator or dominant_speaker(words)
+    transcript_text = transcript_plaintext(words, build_name_map(words, creator))
 
     carousels: List[Dict[str, Any]] = []
     for _ in range(2):  # one retry if nothing parses

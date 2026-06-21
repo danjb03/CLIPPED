@@ -79,6 +79,11 @@ class RegenerateRequest(BaseModel):
     index: int
 
 
+class CarouselRequest(BaseModel):
+    job_id: str
+    creator: str | None = None  # speaker label of the creator (-> "Neil")
+
+
 @app.post("/ingest")
 def ingest(req: IngestRequest):
     try:
@@ -173,9 +178,9 @@ def copy(req: JobRequest):
 
 
 @app.post("/carousels")
-def carousels(req: JobRequest):
+def carousels(req: CarouselRequest):
     try:
-        path = carousel_mod.generate(req.job_id)
+        path = carousel_mod.generate(req.job_id, req.creator)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

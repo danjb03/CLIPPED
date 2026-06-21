@@ -161,8 +161,67 @@ button:disabled {
   background: transparent;
 }
 
+.stepper {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0;
+  margin: 24px 0 8px;
+}
+
+.stepper li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #71717a;
+}
+
+.stepper .num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #3f3f46;
+}
+
+.stepper li.active {
+  color: #ffe600;
+}
+.stepper li.active .num {
+  border-color: #ffe600;
+  color: #ffe600;
+}
+.stepper li.done {
+  color: #22c55e;
+}
+.stepper li.done .num {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.creator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #a1a1aa;
+}
+.creator select {
+  background: #0b0b0f;
+  border: 1px solid #303036;
+  border-radius: 8px;
+  color: #fff;
+  padding: 8px 10px;
+}
+
 .stage {
-  margin: 20px 0;
+  margin: 12px 0;
   font-size: 15px;
   color: #d4d4d8;
 }
@@ -200,11 +259,39 @@ button:disabled {
   gap: 10px;
 }
 
+.previewwrap {
+  position: relative;
+  width: 100%;
+}
+
 .preview {
   width: 100%;
   aspect-ratio: 9 / 16;
   background: #000;
   border-radius: 10px;
+  display: block;
+}
+
+.caphandle {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 230, 0, 0.85);
+  color: #0b0b0f;
+  font-size: 16px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  border: 2px solid #0b0b0f;
+  touch-action: none;
+  user-select: none;
+}
+.caphandle.grabbing {
+  cursor: grabbing;
 }
 
 .meta {

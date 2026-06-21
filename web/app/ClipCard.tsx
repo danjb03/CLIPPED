@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   api,
   CaptionStyle,
@@ -34,8 +34,28 @@ export function ClipCard({
   const [err, setErr] = useState<string | null>(null);
   // cache-buster so the <video> reloads after a re-render
   const [v, setV] = useState(Date.now());
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   const src = `${fileUrl(jobId, `renders/clip_${index}.mp4`)}?v=${v}`;
+
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e: PointerEvent) => {
+      const box = previewRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const x = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
+      const y = Math.min(1, Math.max(0, (e.clientY - box.top) / box.height));
+      setStyle((s) => ({ ...s, position: { x, y } }));
+    };
+    const up = () => setDragging(false);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [dragging]);
 
   async function applyStyle() {
     setErr(null);
@@ -71,7 +91,23 @@ export function ClipCard({
 
   return (
     <div className="card">
-      <video className="preview" src={src} controls playsInline />
+      <div className="previewwrap" ref={previewRef}>
+        <video className="preview" src={src} controls playsInline />
+        <span
+          className={`caphandle${dragging ? " grabbing" : ""}`}
+          title="Drag to move caption position"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          style={{
+            left: `${style.position.x * 100}%`,
+            top: `${style.position.y * 100}%`,
+          }}
+        >
+          ✛
+        </span>
+      </div>
 
       <div className="meta">
         <span className="badge">#{index + 1}</span>

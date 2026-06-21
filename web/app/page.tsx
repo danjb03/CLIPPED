@@ -14,6 +14,8 @@ import {
 
 type WorkerStatus = "checking" | "online" | "offline";
 
+const STAGES = ["Download", "Transcribe", "Select", "Render", "Copy"];
+
 export default function Home() {
   const [worker, setWorker] = useState<WorkerStatus>("checking");
   const [url, setUrl] = useState("");
@@ -27,6 +29,8 @@ export default function Home() {
   const [err, setErr] = useState<string | null>(null);
   const [exportHref, setExportHref] = useState<string | null>(null);
   const [workerInput, setWorkerInput] = useState("");
+  const [creator, setCreator] = useState("");
+  const [step, setStep] = useState(-1);
 
   function checkHealth() {
     setWorker("checking");
@@ -53,28 +57,34 @@ export default function Home() {
     setClips([]);
     setCarousels([]);
     setExportHref(null);
+    setStep(0);
     try {
       setStage("Downloading video…");
       const { job_id } = await api.ingest(url);
       setJobId(job_id);
 
+      setStep(1);
       setStage("Transcribing + diarising (this can take a while)…");
       await api.transcribe(job_id);
 
+      setStep(2);
       setStage("Selecting the best moments…");
       await api.select(job_id, count);
 
+      setStep(3);
       setStage("Rendering captioned clips…");
       await api.render(job_id, splitScreen ? "split" : "single");
 
+      setStep(4);
       setStage("Writing post copy…");
       await api.copy(job_id);
 
       const loaded = await getArtifact<Clip[]>(job_id, "clips.json");
       setClips(loaded);
+      setStep(STAGES.length);
       setStage(null);
     } catch (e) {
-      setErr(String(e));
+      setErr(`${STAGES[step] ?? "Pipeline"} failed: ${e}`);
       setStage(null);
     }
   }
@@ -84,7 +94,7 @@ export default function Home() {
     setErr(null);
     try {
       setStage("Generating carousels…");
-      await api.carousels(jobId);
+      await api.carousels(jobId, creator);
       setStage("Rendering carousel slides…");
       await api.renderCarousels(jobId);
       const loaded = await getArtifact<Carousel[]>(jobId, "carousels.json");
@@ -181,12 +191,39 @@ export default function Home() {
         </button>
       </section>
 
+      {step >= 0 ? (
+        <ol className="stepper">
+          {STAGES.map((s, i) => (
+            <li
+              key={s}
+              className={
+                i < step ? "done" : i === step && running ? "active" : i === step ? "done" : ""
+              }
+            >
+              <span className="num">{i < step || (i === step && !running) ? "✓" : i + 1}</span>
+              {s}
+            </li>
+          ))}
+        </ol>
+      ) : null}
       {stage ? <p className="stage">⏳ {stage}</p> : null}
       {err ? <p className="stage err">⚠ {err}</p> : null}
 
       {clips.length > 0 ? (
         <>
           <div className="toolbar">
+            <label className="creator">
+              Creator
+              <select
+                value={creator}
+                onChange={(e) => setCreator(e.target.value)}
+                disabled={running}
+              >
+                <option value="">Auto</option>
+                <option value="A">Speaker A</option>
+                <option value="B">Speaker B</option>
+              </select>
+            </label>
             <button onClick={makeCarousels} disabled={running}>
               Generate carousels
             </button>

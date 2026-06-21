@@ -57,6 +57,33 @@ def test_transcript_plaintext_groups_speakers():
     assert txt == "A: hello there\nB: hi"
 
 
+def test_dominant_speaker():
+    words = [
+        {"word": "a", "speaker": "A", "start": 0, "end": 1},
+        {"word": "b", "speaker": "A", "start": 1, "end": 2},
+        {"word": "c", "speaker": "B", "start": 2, "end": 3},
+    ]
+    assert carousel.dominant_speaker(words) == "A"
+
+
+def test_build_name_map_two_speakers():
+    words = [
+        {"word": "a", "speaker": "A", "start": 0, "end": 1},
+        {"word": "b", "speaker": "B", "start": 1, "end": 2},
+    ]
+    nm = carousel.build_name_map(words, "B")
+    assert nm == {"B": "Neil", "A": "Guest"}
+
+
+def test_transcript_plaintext_applies_name_map():
+    words = [
+        {"word": "hi", "speaker": "A", "start": 0, "end": 1},
+        {"word": "yo", "speaker": "B", "start": 1, "end": 2},
+    ]
+    txt = carousel.transcript_plaintext(words, {"A": "Neil", "B": "Guest"})
+    assert txt == "Neil: hi\nGuest: yo"
+
+
 def test_render_round_trips():
     out = carousel.parse_carousels(SAMPLE)
     rendered = carousel.render_carousels_txt(out)
