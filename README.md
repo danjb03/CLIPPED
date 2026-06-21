@@ -29,8 +29,9 @@ This repo is being built phase-by-phase per the PRD. **Current status: Phase 1 �
 │  ├─ paths.py      # output/<job_id>/ filesystem helpers
 │  ├─ ingest.py     # yt-dlp download
 │  ├─ transcribe.py # faster-whisper + pyannote -> transcript.json
-│  ├─ select.py / copygen.py / split.py  # later phases (copygen, not "copy",
-│  │                                       to avoid shadowing stdlib copy)
+│  ├─ clipselect.py # Claude clip selection -> clips.json
+│  ├─ copygen.py / split.py  # later phases. clipselect/copygen are renamed
+│  │                          from select/copy to avoid shadowing stdlib modules.
 │  └─ tests/        # unit tests for the speaker-alignment logic
 └─ output/     # generated artifacts, one folder per job (git-ignored)
 ```
@@ -108,10 +109,28 @@ curl -s -XPOST localhost:8000/transcribe -H 'content-type: application/json' \
 
 The first `/transcribe` downloads the Whisper model (set size via `WHISPER_MODEL`).
 
+## Phase 2 usage
+
+```bash
+# pick the N best clips (needs ANTHROPIC_API_KEY)
+curl -s -XPOST localhost:8000/select -H 'content-type: application/json' \
+  -d '{"job_id":"abc123...","count":3}'
+# -> writes output/<job_id>/clips.json =
+#    [{start, end, hook, reason, speaker_focus: "A|B|both"}]
+```
+
+Claude reads the timestamped transcript and returns strict JSON (one retry on a
+parse failure). Each start is snapped to a real word boundary, clamped inside the
+video duration, and nudged to 15-60s. Model via `ANTHROPIC_MODEL` (default
+`claude-sonnet-4-6`). The selection prompt in `clipselect.py` is a generic
+placeholder — swap in your own.
+
 ## Tests
 
 ```bash
-cd worker && python tests/test_transcribe.py   # speaker-alignment logic (no models)
+cd worker
+python tests/test_transcribe.py   # speaker-alignment logic (no models)
+python tests/test_select.py       # clip selection: snapping, validation, JSON
 ```
 
 ## Acceptance tests
@@ -120,12 +139,15 @@ cd worker && python tests/test_transcribe.py   # speaker-alignment logic (no mod
 - **Phase 1:** given a real 2-person podcast URL, `transcript.json` exists, has
   word-level timestamps, and ≥2 distinct speaker labels. (Requires `yt-dlp` on
   PATH and a Hugging Face token for diarisation.)
+- **Phase 2:** `clips.json` has exactly `count` segments, each within the video
+  duration, each starting on a word boundary, valid JSON. (Requires
+  `ANTHROPIC_API_KEY`.)
 
 ## Roadmap
 
 - **Phase 0 — Scaffold** ✅
 - **Phase 1 — Ingest + transcribe** ✅ (yt-dlp + faster-whisper + pyannote)
-- Phase 2 — Clip selection (Claude)
+- **Phase 2 — Clip selection** ✅ (Claude)
 - Phase 3 — Vertical captioned render (Remotion + ffmpeg)
 - Phase 4 — Split-screen mode (static face stack)
 - Phase 5 — Local control UI

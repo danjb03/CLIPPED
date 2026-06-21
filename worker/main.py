@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import clipselect as select_mod
 import ingest as ingest_mod
 import transcribe as transcribe_mod
 from paths import REPO_ROOT
@@ -75,8 +76,18 @@ def transcribe(req: JobRequest):
 
 
 @app.post("/select")
-def select(_: SelectRequest):
-    _not_implemented("Phase 2: Claude clip selection")
+def select(req: SelectRequest):
+    if req.count < 1:
+        raise HTTPException(status_code=400, detail="count must be >= 1")
+    try:
+        path = select_mod.select(req.job_id, req.count)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"job_id": req.job_id, "clips": path}
 
 
 @app.post("/render")
