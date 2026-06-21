@@ -131,8 +131,7 @@ def _remotion_still(props_file, out) -> None:
     subprocess.run(cmd, check=True, cwd=str(WEB_DIR), capture_output=True, text=True)
 
 
-def render(job_id: str, style: Dict[str, Any] | None = None) -> List[str]:
-    """Render every clip in clips.json to renders/clip_N.mp4; return their paths."""
+def _load_job(job_id: str):
     src = source_path(job_id)
     if not src.exists():
         raise FileNotFoundError(f"source.mp4 not found for job {job_id}")
@@ -141,37 +140,51 @@ def render(job_id: str, style: Dict[str, Any] | None = None) -> List[str]:
         raise FileNotFoundError(f"clips.json not found for job {job_id}")
     if not tpath.exists():
         raise FileNotFoundError(f"transcript.json not found for job {job_id}")
+    return src, json.loads(cpath.read_text()), json.loads(tpath.read_text())
 
-    clips = json.loads(cpath.read_text())
-    words = json.loads(tpath.read_text())
-    style = {**DEFAULT_STYLE, **(style or {})}
+
+def _render_one(job_id, idx, clip, words, style, src) -> str:
+    start, end = float(clip["start"]), float(clip["end"])
+    duration = max(0.1, end - start)
 
     renders_dir = job_dir(job_id) / "renders"
     renders_dir.mkdir(parents=True, exist_ok=True)
     PUBLIC_CLIPS.mkdir(parents=True, exist_ok=True)
 
-    outputs: List[str] = []
-    for idx, clip in enumerate(clips):
-        start, end = float(clip["start"]), float(clip["end"])
-        duration = max(0.1, end - start)
+    base_name = f"{job_id}_{idx}.mp4"
+    base_path = PUBLIC_CLIPS / base_name
+    out_path = renders_dir / f"clip_{idx}.mp4"
+    props_file = renders_dir / f".props_{idx}.json"
+    try:
+        _crop_clip(src, start, duration, base_path)
+        clip_words = slice_words(words, start, end)
+        props = build_props(f"clips/{base_name}", clip_words, duration, style)
+        props_file.write_text(json.dumps(props))
+        _remotion_render(props_file, out_path)
+    finally:
+        for tmp in (base_path, props_file):
+            if tmp.exists():
+                tmp.unlink()
+    return str(out_path)
 
-        base_name = f"{job_id}_{idx}.mp4"
-        base_path = PUBLIC_CLIPS / base_name
-        out_path = renders_dir / f"clip_{idx}.mp4"
-        props_file = renders_dir / f".props_{idx}.json"
-        try:
-            _crop_clip(src, start, duration, base_path)
-            clip_words = slice_words(words, start, end)
-            props = build_props(f"clips/{base_name}", clip_words, duration, style)
-            props_file.write_text(json.dumps(props))
-            _remotion_render(props_file, out_path)
-            outputs.append(str(out_path))
-        finally:
-            for tmp in (base_path, props_file):
-                if tmp.exists():
-                    tmp.unlink()
 
-    return outputs
+def render(job_id: str, style: Dict[str, Any] | None = None) -> List[str]:
+    """Render every clip in clips.json to renders/clip_N.mp4; return their paths."""
+    src, clips, words = _load_job(job_id)
+    style = {**DEFAULT_STYLE, **(style or {})}
+    return [
+        _render_one(job_id, idx, clip, words, style, src)
+        for idx, clip in enumerate(clips)
+    ]
+
+
+def render_one(job_id: str, index: int, style: Dict[str, Any] | None = None) -> str:
+    """Re-render a single clip (e.g. after a style change). Returns its path."""
+    src, clips, words = _load_job(job_id)
+    if index < 0 or index >= len(clips):
+        raise IndexError(f"clip index {index} out of range (have {len(clips)})")
+    style = {**DEFAULT_STYLE, **(style or {})}
+    return _render_one(job_id, index, clips[index], words, style, src)
 
 
 def render_carousels(job_id: str, style: Dict[str, Any] | None = None) -> List[str]:

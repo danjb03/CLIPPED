@@ -38,7 +38,9 @@ This repo is being built phase-by-phase per the PRD. **Current status: Phase 1 �
 │  │                  from select/copy to avoid shadowing stdlib modules.
 │  └─ tests/        # unit tests (alignment, selection, render, export)
 ├─ web/
-│  └─ remotion/     # Captions composition (word-synced, styled)
+│  ├─ app/         # control UI (page, ClipCard) + styles
+│  ├─ lib/api.ts   # typed worker client
+│  └─ remotion/    # Captions + CarouselSlide compositions
 └─ output/     # generated artifacts, one folder per job (git-ignored)
 ```
 
@@ -98,6 +100,23 @@ npm install
 npm run dev
 # http://localhost:3000
 ```
+
+## Control UI (Phase 5)
+
+With both services running, drive the whole pipeline from http://localhost:3000:
+
+1. Paste a video URL, set **Posts (N)**, optionally toggle split-screen, click
+   **Analyse & generate** — runs ingest → transcribe → select → render → copy.
+2. Each clip shows a **preview**, the hook, editable **copy** (copy-to-clipboard),
+   and **Style** controls (text/highlight colour, size, caption X/Y) with
+   **Apply style & re-render**, plus **Regenerate clip** (re-picks a fresh,
+   non-overlapping moment and re-renders just that slot).
+3. **Generate carousels** renders the carousel slides inline; **Export .zip**
+   bundles everything and gives a download link.
+
+The worker serves rendered artifacts to the UI from `GET /files/<job_id>/...`.
+Split-screen is a present-but-fallback toggle until Phase 4 lands (it currently
+produces a single centre crop).
 
 ## Phase 1 usage
 
@@ -224,9 +243,9 @@ python tests/test_carousel.py     # carousel parsing + generate + export
 - **Phase 2 — Clip selection** ✅ (Claude)
 - **Phase 3 — Vertical captioned render** ✅ (Remotion + ffmpeg)
 - **Phase 6 — Copy generation + export** ✅ (Claude + zip)
-- Phase 4 — Split-screen mode (static face stack)
-- Phase 5 — Local control UI
+- **Phase 5 — Local control UI** ✅ (drive everything from one screen)
+- Plus: carousel storylines + rendered carousel slides (creator's prompt)
+- Phase 4 — Split-screen mode (static face stack) — the remaining upgrade
 
-Phases 0 → 1 → 2 → 3 → 6 are done: a finished, usable tool (captioned
-single-speaker clips + post copy) with none of the hard ML. Phases 4–5 are
-upgrades on top.
+Phases 0 → 1 → 2 → 3 → 5 → 6 are done: a finished, usable tool with a UI.
+Phase 4 (split-screen) is the last upgrade; the UI already has the toggle.

@@ -179,11 +179,29 @@ def video_duration(job_id: str, words: List[Dict[str, Any]]) -> float:
     return max((float(w["end"]) for w in words), default=0.0)
 
 
-def _ask_claude(transcript_text: str, count: int, duration: float) -> List[Dict[str, Any]]:
+def build_regen_prompt(
+    transcript_text: str, duration: float, avoid: List[Dict[str, float]]
+) -> str:
+    ranges = ", ".join(f"{a['start']:.1f}-{a['end']:.1f}s" for a in avoid) or "none"
+    return (
+        f"Below is a transcript. Each line is `[start_seconds] SPEAKER: text`.\n"
+        f"The video is {duration:.1f} seconds long.\n\n"
+        f"Pick ONE new self-contained moment to cut into a vertical clip that does "
+        f"NOT overlap these already-used ranges: {ranges}.\n"
+        f"Rules:\n"
+        f"- {int(MIN_LEN)}-{int(MAX_LEN)} seconds, within the video, start on a "
+        f"clean sentence boundary.\n\n"
+        f"Return ONLY a JSON array with exactly 1 object:\n"
+        f'[{{"start": 0.0, "end": 0.0, "hook": "", "reason": "", '
+        f'"speaker_focus": "A|B|both"}}]\n\n'
+        f"TRANSCRIPT:\n{transcript_text}"
+    )
+
+
+def _call_claude(prompt: str) -> List[Dict[str, Any]]:
     from anthropic import Anthropic
 
     client = Anthropic()  # reads ANTHROPIC_API_KEY from env
-    prompt = build_user_prompt(transcript_text, count, duration)
     last_err: Exception | None = None
     for _ in range(2):  # one retry on parse failure
         resp = client.messages.create(
@@ -214,9 +232,36 @@ def select(job_id: str, count: int) -> str:
 
     duration = video_duration(job_id, words)
     transcript_text = build_transcript_text(words)
-    raw = _ask_claude(transcript_text, count, duration)
+    raw = _call_claude(build_user_prompt(transcript_text, count, duration))
     clips = normalize_clips(raw, count, words, duration)
 
     out = clips_path(job_id)
     out.write_text(json.dumps(clips, ensure_ascii=False, indent=2))
     return str(out)
+
+
+def regenerate_one(job_id: str, index: int) -> Dict[str, Any]:
+    """Re-pick a single clip slot with a fresh, non-overlapping moment."""
+    tpath, cpath = transcript_path(job_id), clips_path(job_id)
+    if not cpath.exists():
+        raise FileNotFoundError(f"clips.json not found for job {job_id}")
+    if not tpath.exists():
+        raise FileNotFoundError(f"transcript.json not found for job {job_id}")
+    clips = json.loads(cpath.read_text())
+    if index < 0 or index >= len(clips):
+        raise IndexError(f"clip index {index} out of range (have {len(clips)})")
+    words = json.loads(tpath.read_text())
+
+    duration = video_duration(job_id, words)
+    avoid = [
+        {"start": c["start"], "end": c["end"]}
+        for i, c in enumerate(clips)
+        if i != index
+    ]
+    transcript_text = build_transcript_text(words)
+    raw = _call_claude(build_regen_prompt(transcript_text, duration, avoid))
+    new_clip = normalize_clips(raw, 1, words, duration)[0]
+
+    clips[index] = new_clip
+    cpath.write_text(json.dumps(clips, ensure_ascii=False, indent=2))
+    return new_clip

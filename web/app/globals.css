@@ -16,40 +16,42 @@ body {
 }
 
 .wrap {
-  max-width: 640px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 96px 24px;
+  padding: 48px 24px 96px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
 }
 
 h1 {
-  font-size: 44px;
+  font-size: 40px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  margin: 0 0 8px;
+  margin: 0;
 }
 
-.tag {
-  color: #a1a1aa;
-  font-size: 17px;
-  margin: 0 0 32px;
+h2 {
+  font-size: 24px;
+  margin: 40px 0 16px;
 }
 
-.status {
+.status-pill {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 15px;
-  padding: 14px 16px;
-  border: 1px solid #27272a;
-  border-radius: 10px;
-  background: #131318;
+  gap: 8px;
+  font-size: 13px;
+  color: #a1a1aa;
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  flex: 0 0 auto;
   background: #71717a;
 }
 .dot.online {
@@ -62,8 +64,246 @@ h1 {
   background: #eab308;
 }
 
-.phase {
+.panel {
+  background: #131318;
+  border: 1px solid #27272a;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.url {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  background: #0b0b0f;
+  border: 1px solid #303036;
+  border-radius: 10px;
+  color: #fff;
+}
+
+.opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+}
+
+.opts label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #a1a1aa;
+}
+
+.opts input[type="number"],
+.opts select {
+  background: #0b0b0f;
+  border: 1px solid #303036;
+  border-radius: 8px;
+  color: #fff;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.opts .check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: #f4f4f5;
+}
+
+.hint {
+  color: #71717a;
+  font-size: 12px;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid #3f3f46;
+  background: #1f1f25;
+  color: #f4f4f5;
+  padding: 10px 16px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: #ffe600;
+  color: #0b0b0f;
+  border-color: #ffe600;
+  align-self: flex-start;
+}
+
+.ghost {
+  background: transparent;
+}
+
+.stage {
+  margin: 20px 0;
+  font-size: 15px;
+  color: #d4d4d8;
+}
+.stage.err,
+.status.err {
+  color: #f87171;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 28px 0 16px;
+}
+
+.dl {
+  color: #ffe600;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: #131318;
+  border: 1px solid #27272a;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preview {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  background: #000;
+  border-radius: 10px;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+
+.badge {
+  background: #ffe600;
+  color: #0b0b0f;
+  font-weight: 800;
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+
+.focus {
+  margin-left: auto;
+}
+
+.hook {
+  font-size: 14px;
+  color: #e4e4e7;
+  margin: 0;
+  font-style: italic;
+}
+
+.lbl {
+  font-size: 12px;
+  color: #71717a;
+}
+
+.copy {
+  width: 100%;
+  background: #0b0b0f;
+  border: 1px solid #303036;
+  border-radius: 8px;
+  color: #fff;
+  padding: 8px;
+  font-size: 13px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.styler summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #a1a1aa;
+  padding: 4px 0;
+}
+
+.styler .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+
+.styler .row input[type="range"] {
+  flex: 1;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.status {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+.status.busy {
+  color: #eab308;
+}
+
+.carousels .carousel {
+  margin-bottom: 28px;
+}
+
+.ctitle {
+  font-size: 14px;
+  color: #a1a1aa;
+  margin: 0 0 10px;
+}
+
+.slides {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.slide {
+  width: 200px;
+  aspect-ratio: 1080 / 1350;
+  border-radius: 10px;
+  border: 1px solid #27272a;
+  flex: 0 0 auto;
+}
+
+.footnote {
+  margin-top: 40px;
   color: #71717a;
   font-size: 13px;
-  margin-top: 28px;
+}
+
+code {
+  background: #1f1f25;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 12px;
 }

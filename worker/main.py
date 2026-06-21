@@ -8,6 +8,7 @@ import subprocess
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import carousel as carousel_mod
@@ -17,7 +18,7 @@ import exporter as export_mod
 import ingest as ingest_mod
 import render as render_mod
 import transcribe as transcribe_mod
-from paths import REPO_ROOT
+from paths import OUTPUT_DIR, REPO_ROOT
 
 # .env.local lives at the repo root and is shared with the web app.
 load_dotenv(REPO_ROOT / ".env.local")
@@ -38,6 +39,11 @@ def health():
     return {"ok": True}
 
 
+# Serve generated artifacts (rendered clips, slides, zips) for the UI to preview.
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/files", StaticFiles(directory=str(OUTPUT_DIR)), name="files")
+
+
 class IngestRequest(BaseModel):
     url: str
 
@@ -49,6 +55,17 @@ class JobRequest(BaseModel):
 class SelectRequest(BaseModel):
     job_id: str
     count: int = 3
+
+
+class RenderOneRequest(BaseModel):
+    job_id: str
+    index: int
+    style: dict | None = None
+
+
+class RegenerateRequest(BaseModel):
+    job_id: str
+    index: int
 
 
 @app.post("/ingest")
@@ -99,6 +116,36 @@ def render(req: JobRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"job_id": req.job_id, "renders": outputs}
+
+
+@app.post("/render/one")
+def render_one(req: RenderOneRequest):
+    try:
+        path = render_mod.render_one(req.job_id, req.index, req.style)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except IndexError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=e.stderr or str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"job_id": req.job_id, "index": req.index, "render": path}
+
+
+@app.post("/select/regenerate")
+def select_regenerate(req: RegenerateRequest):
+    try:
+        clip = select_mod.regenerate_one(req.job_id, req.index)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except IndexError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"job_id": req.job_id, "index": req.index, "clip": clip}
 
 
 @app.post("/copy")
