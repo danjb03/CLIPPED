@@ -40,5 +40,10 @@ def export(job_id: str) -> str:
         for mp4 in sorted(renders_dir.glob("*.mp4")):
             z.write(mp4, arcname=f"renders/{mp4.name}")
         z.writestr("captions.txt", build_captions_txt(clips))
+        # carousels are optional (separate text artifact)
+        for extra in ("carousels.txt", "carousels.json"):
+            p = jd / extra
+            if p.exists():
+                z.write(p, arcname=extra)
 
     return str(zip_path)

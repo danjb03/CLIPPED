@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import carousel as carousel_mod
 import clipselect as select_mod
 import copygen as copy_mod
 import exporter as export_mod
@@ -111,6 +112,21 @@ def copy(req: JobRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"job_id": req.job_id, "clips": path}
+
+
+@app.post("/carousels")
+def carousels(req: JobRequest):
+    try:
+        path = carousel_mod.generate(req.job_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"job_id": req.job_id, "carousels": path}
 
 
 @app.post("/export")

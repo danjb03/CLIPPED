@@ -32,7 +32,8 @@ This repo is being built phase-by-phase per the PRD. **Current status: Phase 1 �
 │  ├─ clipselect.py # Claude clip selection -> clips.json
 │  ├─ render.py     # ffmpeg crop + Remotion caption render -> renders/*.mp4
 │  ├─ copygen.py    # Claude per-clip post copy -> clips.json
-│  ├─ exporter.py   # zip renders/*.mp4 + captions.txt -> export.zip
+│  ├─ carousel.py   # Claude carousel storylines -> carousels.json + .txt
+│  ├─ exporter.py   # zip renders/*.mp4 + captions.txt (+ carousels) -> export.zip
 │  ├─ split.py      # Phase 4 (split-screen). clipselect/copygen are renamed
 │  │                  from select/copy to avoid shadowing stdlib modules.
 │  └─ tests/        # unit tests (alignment, selection, render, export)
@@ -167,6 +168,22 @@ curl -s -XPOST localhost:8000/export -H 'content-type: application/json' \
 
 The copy prompt in `copygen.py` is a generic placeholder — swap in your own.
 
+### Carousels (text storylines)
+
+A separate text artifact from the video clips: reads the whole transcript and
+extracts 6-10 carousel storylines (internal title + 4 story-arc slides) using the
+creator's prompt in `carousel.py`.
+
+```bash
+curl -s -XPOST localhost:8000/carousels -H 'content-type: application/json' \
+  -d '{"job_id":"abc123..."}'
+# -> output/<job_id>/carousels.json (structured) + carousels.txt (postable)
+```
+
+`carousels.txt` / `carousels.json` are also added to `export.zip` when present.
+Note: speaker labels in the transcript are `A`/`B`, not real names, so the model
+can't reliably attribute lines to "Neil" specifically.
+
 ## Tests
 
 ```bash
@@ -175,6 +192,7 @@ python tests/test_transcribe.py   # speaker-alignment logic (no models)
 python tests/test_select.py       # clip selection: snapping, validation, JSON
 python tests/test_render.py       # render helpers: word-slicing, ffmpeg cmd
 python tests/test_export.py       # copy attach (stubbed Claude) + export zip
+python tests/test_carousel.py     # carousel parsing + generate + export
 ```
 
 ## Acceptance tests
