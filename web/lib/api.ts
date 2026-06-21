@@ -1,7 +1,25 @@
 // Thin typed client for the FastAPI worker.
+//
+// The worker URL is resolved at runtime (not baked in at build time) so the
+// deployed UI can point at any local tunnel (cloudflared/ngrok) you paste in.
+// Priority: localStorage("workerUrl") > NEXT_PUBLIC_WORKER_URL > localhost.
 
-export const WORKER_URL =
+const ENV_WORKER_URL =
   process.env.NEXT_PUBLIC_WORKER_URL ?? "http://localhost:8000";
+
+export function getWorkerUrl(): string {
+  if (typeof window !== "undefined") {
+    const saved = window.localStorage.getItem("workerUrl");
+    if (saved) return saved.replace(/\/$/, "");
+  }
+  return ENV_WORKER_URL.replace(/\/$/, "");
+}
+
+export function setWorkerUrl(url: string): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("workerUrl", url.replace(/\/$/, ""));
+  }
+}
 
 export type CaptionStyle = {
   fontFamily: string;
@@ -41,7 +59,7 @@ export type Carousel = {
 };
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${WORKER_URL}${path}`, {
+  const res = await fetch(`${getWorkerUrl()}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -60,7 +78,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export function fileUrl(jobId: string, relPath: string): string {
-  return `${WORKER_URL}/files/${jobId}/${relPath}`;
+  return `${getWorkerUrl()}/files/${jobId}/${relPath}`;
 }
 
 export async function getArtifact<T>(jobId: string, name: string): Promise<T> {
@@ -70,7 +88,7 @@ export async function getArtifact<T>(jobId: string, name: string): Promise<T> {
 }
 
 export const api = {
-  health: () => fetch(`${WORKER_URL}/health`).then((r) => r.json()),
+  health: () => fetch(`${getWorkerUrl()}/health`).then((r) => r.json()),
   ingest: (url: string) => post<{ job_id: string }>("/ingest", { url }),
   transcribe: (jobId: string) =>
     post<{ transcript: string }>("/transcribe", { job_id: jobId }),

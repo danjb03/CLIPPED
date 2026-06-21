@@ -8,7 +8,8 @@ import {
   Clip,
   fileUrl,
   getArtifact,
-  WORKER_URL,
+  getWorkerUrl,
+  setWorkerUrl,
 } from "../lib/api";
 
 type WorkerStatus = "checking" | "online" | "offline";
@@ -25,13 +26,25 @@ export default function Home() {
   const [stage, setStage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [exportHref, setExportHref] = useState<string | null>(null);
+  const [workerInput, setWorkerInput] = useState("");
 
-  useEffect(() => {
+  function checkHealth() {
+    setWorker("checking");
     api
       .health()
       .then((d) => setWorker(d?.ok ? "online" : "offline"))
       .catch(() => setWorker("offline"));
+  }
+
+  useEffect(() => {
+    setWorkerInput(getWorkerUrl());
+    checkHealth();
   }, []);
+
+  function saveWorker() {
+    setWorkerUrl(workerInput.trim());
+    checkHealth();
+  }
 
   const running = stage !== null;
 
@@ -110,6 +123,21 @@ export default function Home() {
           {worker === "online" ? "worker online" : worker === "offline" ? "worker offline" : "…"}
         </div>
       </header>
+
+      <section className="panel conn">
+        <label className="lbl">Worker URL (your local tunnel)</label>
+        <div className="connrow">
+          <input
+            className="url"
+            placeholder="https://your-tunnel.trycloudflare.com"
+            value={workerInput}
+            onChange={(e) => setWorkerInput(e.target.value)}
+          />
+          <button className="ghost" onClick={saveWorker}>
+            Save &amp; test
+          </button>
+        </div>
+      </section>
 
       <section className="panel">
         <input
@@ -212,8 +240,10 @@ export default function Home() {
 
       {worker === "offline" ? (
         <p className="footnote">
-          Start the worker: <code>cd worker &amp;&amp; uvicorn main:app --port 8000</code>{" "}
-          ({WORKER_URL})
+          Worker offline. Run it locally (<code>uvicorn main:app --port 8000</code>),
+          expose it with a tunnel (e.g.{" "}
+          <code>cloudflared tunnel --url http://localhost:8000</code>), then paste the
+          tunnel URL above and click <strong>Save &amp; test</strong>.
         </p>
       ) : null}
     </main>

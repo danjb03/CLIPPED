@@ -25,10 +25,15 @@ load_dotenv(REPO_ROOT / ".env.local")
 
 app = FastAPI(title="Clip Engine Worker", version="0.0.0")
 
-# Local dev only: the Next.js UI (localhost:3000) calls this worker directly.
+# CORS: the UI (localhost or a Vercel domain) calls this worker directly. Set
+# CORS_ORIGINS to a comma-separated allowlist; defaults to "*" since this is a
+# single-user tool with no credentials/cookies.
+import os as _os
+
+_origins = [o.strip() for o in _os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
