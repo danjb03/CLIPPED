@@ -1,19 +1,19 @@
 """Clip Engine — FastAPI worker.
 
-Phase 0 (scaffold): only `/health` is implemented. The remaining routes are
-declared as honest stubs so the API surface and repo structure match the PRD;
-each is filled in during its phase.
+Implemented: /health, /ingest, /transcribe (Phase 1). The remaining routes are
+honest stubs filled in during their phase.
 """
-
-from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import ingest as ingest_mod
+import transcribe as transcribe_mod
+from paths import REPO_ROOT
+
 # .env.local lives at the repo root and is shared with the web app.
-REPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(REPO_ROOT / ".env.local")
 
 app = FastAPI(title="Clip Engine Worker", version="0.0.0")
@@ -53,13 +53,25 @@ def _not_implemented(phase: str):
 
 
 @app.post("/ingest")
-def ingest(_: IngestRequest):
-    _not_implemented("Phase 1: yt-dlp download")
+def ingest(req: IngestRequest):
+    try:
+        job_id = ingest_mod.download(req.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"job_id": job_id}
 
 
 @app.post("/transcribe")
-def transcribe(_: JobRequest):
-    _not_implemented("Phase 1: AssemblyAI transcription")
+def transcribe(req: JobRequest):
+    try:
+        path = transcribe_mod.transcribe(req.job_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"job_id": req.job_id, "transcript": path}
 
 
 @app.post("/select")

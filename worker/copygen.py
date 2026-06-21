@@ -1,5 +1,8 @@
 """Phase 6 — per-clip post copy with Claude.
 
+NOTE: named copygen.py (not copy.py) because a module named `copy` on the
+worker's sys.path shadows Python's stdlib `copy`, which FastAPI imports.
+
 Stub: implemented in Phase 6. TODO: paste the user's copy prompt here.
 """
 
