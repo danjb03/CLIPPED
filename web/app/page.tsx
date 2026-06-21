@@ -52,7 +52,7 @@ export default function Home() {
       await api.select(job_id, count);
 
       setStage("Rendering captioned clips…");
-      await api.render(job_id);
+      await api.render(job_id, splitScreen ? "split" : "single");
 
       setStage("Writing post copy…");
       await api.copy(job_id);
@@ -179,6 +179,7 @@ export default function Home() {
                 jobId={jobId!}
                 index={i}
                 clip={clip}
+                mode={splitScreen ? "split" : "single"}
                 onClipChange={onClipChange}
               />
             ))}

@@ -115,8 +115,15 @@ With both services running, drive the whole pipeline from http://localhost:3000:
    bundles everything and gives a download link.
 
 The worker serves rendered artifacts to the UI from `GET /files/<job_id>/...`.
-Split-screen is a present-but-fallback toggle until Phase 4 lands (it currently
-produces a single centre crop).
+
+### Split-screen (Phase 4)
+
+With the **Split-screen** toggle on, the worker samples frames, runs MediaPipe
+face detection, clusters into two stable regions, crops each to 1080×960 and
+`vstack`s them into a 1080×1920 base before captions render over it. If two
+stable faces aren't found (or anything fails), it falls back to a single centre
+crop — it never crashes. Requires `mediapipe` + `opencv-python` (in
+`requirements.txt`).
 
 ## Phase 1 usage
 
@@ -220,6 +227,7 @@ python tests/test_select.py       # clip selection: snapping, validation, JSON
 python tests/test_render.py       # render helpers: word-slicing, ffmpeg cmd
 python tests/test_export.py       # copy attach (stubbed Claude) + export zip
 python tests/test_carousel.py     # carousel parsing + generate + export
+python tests/test_split.py        # split-screen: clustering, crop, stack, fallback
 ```
 
 ## Acceptance tests
@@ -244,8 +252,8 @@ python tests/test_carousel.py     # carousel parsing + generate + export
 - **Phase 3 — Vertical captioned render** ✅ (Remotion + ffmpeg)
 - **Phase 6 — Copy generation + export** ✅ (Claude + zip)
 - **Phase 5 — Local control UI** ✅ (drive everything from one screen)
+- **Phase 4 — Split-screen mode** ✅ (static two-face stack, MediaPipe)
 - Plus: carousel storylines + rendered carousel slides (creator's prompt)
-- Phase 4 — Split-screen mode (static face stack) — the remaining upgrade
 
-Phases 0 → 1 → 2 → 3 → 5 → 6 are done: a finished, usable tool with a UI.
-Phase 4 (split-screen) is the last upgrade; the UI already has the toggle.
+All PRD phases are done: a finished, usable tool with a UI, captioned vertical
+clips (single or split-screen), post copy, carousels, and export.

@@ -19,11 +19,13 @@ export function ClipCard({
   jobId,
   index,
   clip,
+  mode,
   onClipChange,
 }: {
   jobId: string;
   index: number;
   clip: Clip;
+  mode: "single" | "split";
   onClipChange: (index: number, clip: Clip) => void;
 }) {
   const [style, setStyle] = useState<CaptionStyle>(DEFAULT_STYLE);
@@ -39,7 +41,7 @@ export function ClipCard({
     setErr(null);
     setBusy("Re-rendering…");
     try {
-      await api.renderOne(jobId, index, style);
+      await api.renderOne(jobId, index, style, mode);
       setV(Date.now());
     } catch (e) {
       setErr(String(e));
@@ -55,7 +57,7 @@ export function ClipCard({
       const { clip: next } = await api.regenerate(jobId, index);
       onClipChange(index, { ...next, copy: clip.copy });
       setBusy("Re-rendering…");
-      await api.renderOne(jobId, index, style);
+      await api.renderOne(jobId, index, style, mode);
       setV(Date.now());
     } catch (e) {
       setErr(String(e));

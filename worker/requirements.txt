@@ -13,5 +13,5 @@ pyannote.audio==3.3.2
 anthropic==0.42.0
 
 # Phase 4 — split-screen face detection
-# mediapipe==0.10.18
-# opencv-python==4.10.0.84
+mediapipe==0.10.18
+opencv-python==4.10.0.84

@@ -143,7 +143,7 @@ def _load_job(job_id: str):
     return src, json.loads(cpath.read_text()), json.loads(tpath.read_text())
 
 
-def _render_one(job_id, idx, clip, words, style, src) -> str:
+def _render_one(job_id, idx, clip, words, style, src, mode="single") -> str:
     start, end = float(clip["start"]), float(clip["end"])
     duration = max(0.1, end - start)
 
@@ -156,7 +156,12 @@ def _render_one(job_id, idx, clip, words, style, src) -> str:
     out_path = renders_dir / f"clip_{idx}.mp4"
     props_file = renders_dir / f".props_{idx}.json"
     try:
-        _crop_clip(src, start, duration, base_path)
+        stacked = False
+        if mode == "split":
+            import split  # lazy: only needs cv2/mediapipe in split mode
+            stacked = split.make_stacked_base(str(src), start, duration, str(base_path))
+        if not stacked:
+            _crop_clip(src, start, duration, base_path)
         clip_words = slice_words(words, start, end)
         props = build_props(f"clips/{base_name}", clip_words, duration, style)
         props_file.write_text(json.dumps(props))
@@ -168,23 +173,25 @@ def _render_one(job_id, idx, clip, words, style, src) -> str:
     return str(out_path)
 
 
-def render(job_id: str, style: Dict[str, Any] | None = None) -> List[str]:
+def render(job_id: str, style: Dict[str, Any] | None = None, mode: str = "single") -> List[str]:
     """Render every clip in clips.json to renders/clip_N.mp4; return their paths."""
     src, clips, words = _load_job(job_id)
     style = {**DEFAULT_STYLE, **(style or {})}
     return [
-        _render_one(job_id, idx, clip, words, style, src)
+        _render_one(job_id, idx, clip, words, style, src, mode)
         for idx, clip in enumerate(clips)
     ]
 
 
-def render_one(job_id: str, index: int, style: Dict[str, Any] | None = None) -> str:
+def render_one(
+    job_id: str, index: int, style: Dict[str, Any] | None = None, mode: str = "single"
+) -> str:
     """Re-render a single clip (e.g. after a style change). Returns its path."""
     src, clips, words = _load_job(job_id)
     if index < 0 or index >= len(clips):
         raise IndexError(f"clip index {index} out of range (have {len(clips)})")
     style = {**DEFAULT_STYLE, **(style or {})}
-    return _render_one(job_id, index, clips[index], words, style, src)
+    return _render_one(job_id, index, clips[index], words, style, src, mode)
 
 
 def render_carousels(job_id: str, style: Dict[str, Any] | None = None) -> List[str]:

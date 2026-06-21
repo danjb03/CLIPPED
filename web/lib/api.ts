@@ -76,10 +76,14 @@ export const api = {
     post<{ transcript: string }>("/transcribe", { job_id: jobId }),
   select: (jobId: string, count: number) =>
     post<{ clips: string }>("/select", { job_id: jobId, count }),
-  render: (jobId: string) =>
-    post<{ renders: string[] }>("/render", { job_id: jobId }),
-  renderOne: (jobId: string, index: number, style: CaptionStyle) =>
-    post<{ render: string }>("/render/one", { job_id: jobId, index, style }),
+  render: (jobId: string, mode: "single" | "split" = "single") =>
+    post<{ renders: string[] }>("/render", { job_id: jobId, mode }),
+  renderOne: (
+    jobId: string,
+    index: number,
+    style: CaptionStyle,
+    mode: "single" | "split" = "single"
+  ) => post<{ render: string }>("/render/one", { job_id: jobId, index, style, mode }),
   regenerate: (jobId: string, index: number) =>
     post<{ clip: Clip }>("/select/regenerate", { job_id: jobId, index }),
   copy: (jobId: string) => post<{ clips: string }>("/copy", { job_id: jobId }),

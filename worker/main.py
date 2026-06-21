@@ -57,10 +57,16 @@ class SelectRequest(BaseModel):
     count: int = 3
 
 
+class RenderRequest(BaseModel):
+    job_id: str
+    mode: str = "single"  # "single" | "split"
+
+
 class RenderOneRequest(BaseModel):
     job_id: str
     index: int
     style: dict | None = None
+    mode: str = "single"
 
 
 class RegenerateRequest(BaseModel):
@@ -106,9 +112,9 @@ def select(req: SelectRequest):
 
 
 @app.post("/render")
-def render(req: JobRequest):
+def render(req: RenderRequest):
     try:
-        outputs = render_mod.render(req.job_id)
+        outputs = render_mod.render(req.job_id, mode=req.mode)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except subprocess.CalledProcessError as e:
@@ -121,7 +127,7 @@ def render(req: JobRequest):
 @app.post("/render/one")
 def render_one(req: RenderOneRequest):
     try:
-        path = render_mod.render_one(req.job_id, req.index, req.style)
+        path = render_mod.render_one(req.job_id, req.index, req.style, req.mode)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except IndexError as e:
