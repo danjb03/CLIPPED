@@ -1,0 +1,14 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-dotenv==1.0.1
+pydantic==2.10.4
+
+# Added in later phases (kept here so one `pip install` covers the roadmap):
+# Phase 1 — ingest + transcribe
+yt-dlp==2025.1.15
+assemblyai==0.37.0
+# Phase 2/6 — clip selection + copy
+anthropic==0.42.0
+# Phase 4 — split-screen face detection
+# mediapipe==0.10.18
+# opencv-python==4.10.0.84
