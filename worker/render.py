@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List
 
 from paths import REPO_ROOT, clips_path, job_dir, source_path, transcript_path
@@ -21,6 +22,9 @@ from paths import REPO_ROOT, clips_path, job_dir, source_path, transcript_path
 WEB_DIR = REPO_ROOT / "web"
 PUBLIC_CLIPS = WEB_DIR / "public" / "clips"
 FPS = int(os.environ.get("RENDER_FPS", "30"))
+# How many clips to render at once. Helps on multi-core boxes; keep at 1 on a
+# single-vCPU / low-RAM host to avoid thrashing or OOM.
+RENDER_PARALLEL = max(1, int(os.environ.get("RENDER_PARALLEL", "2")))
 
 # Largest centred 9:16 rectangle that fits the source, scaled to 1080x1920.
 CROP_FILTER = r"crop=min(iw\,ih*9/16):min(ih\,iw*16/9),scale=1080:1920,setsar=1"
@@ -177,10 +181,24 @@ def render(job_id: str, style: Dict[str, Any] | None = None, mode: str = "single
     """Render every clip in clips.json to renders/clip_N.mp4; return their paths."""
     src, clips, words = _load_job(job_id)
     style = {**DEFAULT_STYLE, **(style or {})}
-    return [
-        _render_one(job_id, idx, clip, words, style, src, mode)
-        for idx, clip in enumerate(clips)
-    ]
+
+    if RENDER_PARALLEL <= 1 or len(clips) <= 1:
+        return [
+            _render_one(job_id, idx, clip, words, style, src, mode)
+            for idx, clip in enumerate(clips)
+        ]
+
+    # Render clips concurrently. Each _render_one uses index-scoped temp files,
+    # so there are no collisions.
+    results: List[str] = [""] * len(clips)
+    with ThreadPoolExecutor(max_workers=RENDER_PARALLEL) as ex:
+        futures = {
+            ex.submit(_render_one, job_id, idx, clip, words, style, src, mode): idx
+            for idx, clip in enumerate(clips)
+        }
+        for fut in futures:
+            results[futures[fut]] = fut.result()
+    return results
 
 
 def render_one(

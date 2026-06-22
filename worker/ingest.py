@@ -23,12 +23,13 @@ def download(url: str) -> str:
     jd = job_dir(job_id)
     jd.mkdir(parents=True, exist_ok=True)
 
-    # Best video+audio, merged to mp4 so downstream ffmpeg/whisper has one file.
+    # Best video+audio, merged to mp4. Cap at 1080p — we crop to vertical, so
+    # pulling 4K just wastes download time and disk.
     out_tmpl = str(jd / "source.%(ext)s")
     cmd = [
         "yt-dlp",
         "-f",
-        "bv*+ba/b",
+        "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b",
         "--merge-output-format",
         "mp4",
         "-o",
