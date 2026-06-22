@@ -126,12 +126,49 @@ def _diarize(wav: str) -> List[Segment]:
         return []
 
 
+def _assemblyai_words(wav: str) -> List[Word]:
+    """Transcribe + diarise via AssemblyAI (one call gives words + speakers)."""
+    import assemblyai as aai
+
+    key = os.environ.get("ASSEMBLYAI_API_KEY")
+    if not key:
+        raise RuntimeError("ASSEMBLYAI_API_KEY not set")
+    aai.settings.api_key = key
+    transcript = aai.Transcriber().transcribe(
+        wav, aai.TranscriptionConfig(speaker_labels=True)
+    )
+    if transcript.status == aai.TranscriptStatus.error:
+        raise RuntimeError(f"AssemblyAI error: {transcript.error}")
+    words: List[Word] = []
+    for w in transcript.words or []:
+        text = (w.text or "").strip()
+        if not text:
+            continue
+        words.append(
+            {
+                "word": text,
+                "start": round((w.start or 0) / 1000, 3),  # ms -> s
+                "end": round((w.end or 0) / 1000, 3),
+                "speaker": w.speaker or "A",
+            }
+        )
+    return words
+
+
 def transcribe(job_id: str) -> str:
-    """Transcribe + diarise source.mp4, write transcript.json, return its path."""
+    """Transcribe + diarise source.mp4, write transcript.json, return its path.
+
+    TRANSCRIBE_BACKEND="assemblyai" uses AssemblyAI (hosted-friendly, one call for
+    words + speakers); anything else uses local faster-whisper + pyannote.
+    """
     wav = _extract_audio(job_id)
-    words = _whisper_words(wav)
-    segments = _diarize(wav)
-    words = assign_speakers(words, segments)
+    backend = os.environ.get("TRANSCRIBE_BACKEND", "local").lower()
+
+    if backend == "assemblyai":
+        words = _assemblyai_words(wav)
+    else:
+        words = _whisper_words(wav)
+        words = assign_speakers(words, _diarize(wav))
     words = relabel_speakers(words)
 
     out = transcript_path(job_id)

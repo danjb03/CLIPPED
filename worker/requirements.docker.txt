@@ -1,0 +1,14 @@
+# Slim deps for the HOSTED worker (managed transcription via AssemblyAI).
+# No torch/faster-whisper/pyannote -> small, cheap, fast container.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-dotenv==1.0.1
+pydantic==2.10.4
+
+yt-dlp==2025.1.15
+assemblyai==0.37.0
+anthropic==0.42.0
+
+# Split-screen face detection (headless OpenCV avoids GUI system libs)
+mediapipe==0.10.18
+opencv-python-headless==4.10.0.84

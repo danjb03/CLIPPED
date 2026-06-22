@@ -219,6 +219,25 @@ curl -s -XPOST localhost:8000/carousels/render -H 'content-type: application/jso
 is auto-detected as the dominant speaker, or set it via the **Creator** dropdown
 in the UI / the `creator` field on `/carousels`.
 
+## Hosting the worker (no local terminal)
+
+To use the Vercel UI without running anything locally, host the worker as a
+container. It's built for managed transcription (AssemblyAI), so the image is
+small and cheap to run.
+
+1. **Render → New + → Blueprint →** connect `danjb03/CLIPPED`. It reads
+   `render.yaml` and builds the root `Dockerfile`.
+2. Set the secrets in the dashboard: `ANTHROPIC_API_KEY`, `ASSEMBLYAI_API_KEY`,
+   and `WORKER_TOKEN` (any random string — your private access key).
+3. Deploy → you get `https://clip-engine-worker-xxx.onrender.com`.
+4. In Vercel, set `NEXT_PUBLIC_WORKER_URL` to that URL and redeploy so the UI
+   defaults to it. Enter the `WORKER_TOKEN` once in the UI's "Worker token" field.
+
+Config (env): `TRANSCRIBE_BACKEND=assemblyai|local`, `CORS_ORIGINS` (default `*`),
+`WORKER_TOKEN` (when set, all POST endpoints require an `X-Worker-Token` header;
+`/health` and `/files` stay open). The `Dockerfile` bundles ffmpeg + Node +
+Remotion's headless Chrome.
+
 ## Tests
 
 ```bash

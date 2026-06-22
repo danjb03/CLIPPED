@@ -21,6 +21,19 @@ export function setWorkerUrl(url: string): void {
   }
 }
 
+export function getWorkerToken(): string {
+  if (typeof window !== "undefined") {
+    return window.localStorage.getItem("workerToken") ?? "";
+  }
+  return "";
+}
+
+export function setWorkerToken(token: string): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("workerToken", token);
+  }
+}
+
 export type CaptionStyle = {
   fontFamily: string;
   fontSize: number;
@@ -59,9 +72,13 @@ export type Carousel = {
 };
 
 async function post<T>(path: string, body: unknown): Promise<T> {
+  const token = getWorkerToken();
   const res = await fetch(`${getWorkerUrl()}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { "x-worker-token": token } : {}),
+    },
     body: JSON.stringify(body),
   });
   if (!res.ok) {

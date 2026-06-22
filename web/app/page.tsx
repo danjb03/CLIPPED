@@ -8,7 +8,9 @@ import {
   Clip,
   fileUrl,
   getArtifact,
+  getWorkerToken,
   getWorkerUrl,
+  setWorkerToken,
   setWorkerUrl,
 } from "../lib/api";
 
@@ -29,6 +31,7 @@ export default function Home() {
   const [err, setErr] = useState<string | null>(null);
   const [exportHref, setExportHref] = useState<string | null>(null);
   const [workerInput, setWorkerInput] = useState("");
+  const [tokenInput, setTokenInput] = useState("");
   const [creator, setCreator] = useState("");
   const [step, setStep] = useState(-1);
 
@@ -42,11 +45,13 @@ export default function Home() {
 
   useEffect(() => {
     setWorkerInput(getWorkerUrl());
+    setTokenInput(getWorkerToken());
     checkHealth();
   }, []);
 
   function saveWorker() {
     setWorkerUrl(workerInput.trim());
+    setWorkerToken(tokenInput.trim());
     checkHealth();
   }
 
@@ -135,13 +140,23 @@ export default function Home() {
       </header>
 
       <section className="panel conn">
-        <label className="lbl">Worker URL (your local tunnel)</label>
+        <label className="lbl">Worker URL</label>
         <div className="connrow">
           <input
             className="url"
-            placeholder="https://your-tunnel.trycloudflare.com"
+            placeholder="https://your-worker.onrender.com"
             value={workerInput}
             onChange={(e) => setWorkerInput(e.target.value)}
+          />
+        </div>
+        <label className="lbl">Worker token (if set)</label>
+        <div className="connrow">
+          <input
+            className="url"
+            type="password"
+            placeholder="optional access token"
+            value={tokenInput}
+            onChange={(e) => setTokenInput(e.target.value)}
           />
           <button className="ghost" onClick={saveWorker}>
             Save &amp; test

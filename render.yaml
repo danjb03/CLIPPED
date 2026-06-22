@@ -1,0 +1,22 @@
+# Render blueprint for the hosted Clip Engine worker.
+# In Render: New + -> Blueprint -> connect danjb03/CLIPPED -> it reads this file.
+# Then set the three "sync: false" secrets in the dashboard.
+services:
+  - type: web
+    name: clip-engine-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard            # ~2GB RAM for Chrome/ffmpeg render; "starter" may OOM
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: TRANSCRIBE_BACKEND
+        value: assemblyai
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ASSEMBLYAI_API_KEY
+        sync: false
+      - key: WORKER_TOKEN
+        sync: false

@@ -8,6 +8,8 @@ yt-dlp==2025.1.15
 faster-whisper==1.1.0
 # Diarisation (speaker labels). pyannote pulls in torch/torchaudio.
 pyannote.audio==3.3.2
+# Optional managed backend (TRANSCRIBE_BACKEND=assemblyai)
+assemblyai==0.37.0
 
 # Phase 2/6 — clip selection + copy
 anthropic==0.42.0
