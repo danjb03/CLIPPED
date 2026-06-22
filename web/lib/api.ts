@@ -23,9 +23,10 @@ export function setWorkerUrl(url: string): void {
 
 export function getWorkerToken(): string {
   if (typeof window !== "undefined") {
-    return window.localStorage.getItem("workerToken") ?? "";
+    const saved = window.localStorage.getItem("workerToken");
+    if (saved) return saved;
   }
-  return "";
+  return process.env.NEXT_PUBLIC_WORKER_TOKEN ?? "";
 }
 
 export function setWorkerToken(token: string): void {
