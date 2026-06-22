@@ -292,10 +292,10 @@ export default function Home() {
 
       {worker === "offline" ? (
         <p className="footnote">
-          Worker offline. Run it locally (<code>uvicorn main:app --port 8000</code>),
-          expose it with a tunnel (e.g.{" "}
-          <code>cloudflared tunnel --url http://localhost:8000</code>), then paste the
-          tunnel URL above and click <strong>Save &amp; test</strong>.
+          Worker offline. Enter your deployed <strong>Worker URL</strong> above (and
+          token, if set) and click <strong>Save &amp; test</strong>. Once
+          <code>NEXT_PUBLIC_WORKER_URL</code> is configured in Vercel, the link
+          connects automatically.
         </p>
       ) : null}
     </main>
