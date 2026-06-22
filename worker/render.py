@@ -22,9 +22,12 @@ from paths import REPO_ROOT, clips_path, job_dir, source_path, transcript_path
 WEB_DIR = REPO_ROOT / "web"
 PUBLIC_CLIPS = WEB_DIR / "public" / "clips"
 FPS = int(os.environ.get("RENDER_FPS", "30"))
-# How many clips to render at once. Helps on multi-core boxes; keep at 1 on a
-# single-vCPU / low-RAM host to avoid thrashing or OOM.
-RENDER_PARALLEL = max(1, int(os.environ.get("RENDER_PARALLEL", "2")))
+# How many clips to render at once. Default 1 — each Remotion render is a full
+# headless Chrome and ~1GB+, so >1 OOMs small (2GB) hosts. Raise only on a box
+# with spare RAM + cores.
+RENDER_PARALLEL = max(1, int(os.environ.get("RENDER_PARALLEL", "1")))
+# Chrome tabs per render. 1 keeps peak memory low on small hosts.
+RENDER_FRAME_CONCURRENCY = max(1, int(os.environ.get("RENDER_FRAME_CONCURRENCY", "1")))
 
 # Largest centred 9:16 rectangle that fits the source, scaled to 1080x1920.
 CROP_FILTER = r"crop=min(iw\,ih*9/16):min(ih\,iw*16/9),scale=1080:1920,setsar=1"
@@ -119,6 +122,7 @@ def _remotion_render(props_file, out) -> None:
         "remotion/index.ts", "Captions",
         str(out),
         f"--props={props_file}",
+        f"--concurrency={RENDER_FRAME_CONCURRENCY}",
         "--log=error",
     ]
     subprocess.run(cmd, check=True, cwd=str(WEB_DIR), capture_output=True, text=True)

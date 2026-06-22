@@ -14,6 +14,11 @@ services:
         value: assemblyai
       - key: CORS_ORIGINS
         value: "*"
+      # Keep memory in check on a 2GB box: one render, one Chrome tab at a time.
+      - key: RENDER_PARALLEL
+        value: "1"
+      - key: RENDER_FRAME_CONCURRENCY
+        value: "1"
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ASSEMBLYAI_API_KEY
