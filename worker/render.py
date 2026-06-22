@@ -151,31 +151,57 @@ def _load_job(job_id: str):
     return src, json.loads(cpath.read_text()), json.loads(tpath.read_text())
 
 
+def _subtitles_filter(ass_path) -> str:
+    p = str(ass_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    return f"subtitles='{p}'"
+
+
+def _trim_crop_burn(src, start: float, duration: float, ass_path, out) -> None:
+    """One pass: trim, centre-crop to 1080x1920, burn captions."""
+    vf = CROP_FILTER + "," + _subtitles_filter(ass_path)
+    subprocess.run(
+        ["ffmpeg", "-y", "-ss", f"{start:.3f}", "-i", str(src), "-t", f"{duration:.3f}",
+         "-vf", vf, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+         "-c:a", "aac", "-movflags", "+faststart", str(out)],
+        check=True, capture_output=True, text=True,
+    )
+
+
+def _burn(base, ass_path, out) -> None:
+    """Burn captions over an already-prepared 1080x1920 clip (e.g. a split stack)."""
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(base), "-vf", _subtitles_filter(ass_path),
+         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+         "-c:a", "aac", "-movflags", "+faststart", str(out)],
+        check=True, capture_output=True, text=True,
+    )
+
+
 def _render_one(job_id, idx, clip, words, style, src, mode="single") -> str:
+    from captions_ass import build_ass
+
     start, end = float(clip["start"]), float(clip["end"])
     duration = max(0.1, end - start)
 
     renders_dir = job_dir(job_id) / "renders"
     renders_dir.mkdir(parents=True, exist_ok=True)
-    PUBLIC_CLIPS.mkdir(parents=True, exist_ok=True)
 
-    base_name = f"{job_id}_{idx}.mp4"
-    base_path = PUBLIC_CLIPS / base_name
     out_path = renders_dir / f"clip_{idx}.mp4"
-    props_file = renders_dir / f".props_{idx}.json"
+    ass_path = renders_dir / f".cap_{idx}.ass"
+    base_path = renders_dir / f".base_{idx}.mp4"
+
+    ass_path.write_text(build_ass(slice_words(words, start, end), style))
     try:
         stacked = False
         if mode == "split":
             import split  # lazy: only needs cv2/mediapipe in split mode
             stacked = split.make_stacked_base(str(src), start, duration, str(base_path))
-        if not stacked:
-            _crop_clip(src, start, duration, base_path)
-        clip_words = slice_words(words, start, end)
-        props = build_props(f"clips/{base_name}", clip_words, duration, style)
-        props_file.write_text(json.dumps(props))
-        _remotion_render(props_file, out_path)
+        if stacked:
+            _burn(base_path, ass_path, out_path)
+        else:
+            _trim_crop_burn(src, start, duration, ass_path, out_path)
     finally:
-        for tmp in (base_path, props_file):
+        for tmp in (ass_path, base_path):
             if tmp.exists():
                 tmp.unlink()
     return str(out_path)
