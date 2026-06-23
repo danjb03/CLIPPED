@@ -139,35 +139,20 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="panel conn">
-        <label className="lbl">Worker URL</label>
-        <div className="connrow">
-          <input
-            className="url"
-            placeholder="https://your-worker.onrender.com"
-            value={workerInput}
-            onChange={(e) => setWorkerInput(e.target.value)}
-          />
-        </div>
-        <label className="lbl">Worker token (if set)</label>
-        <div className="connrow">
-          <input
-            className="url"
-            type="password"
-            placeholder="optional access token"
-            value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-          />
-          <button className="ghost" onClick={saveWorker}>
-            Save &amp; test
-          </button>
-        </div>
+      <section className="howto">
+        <ol>
+          <li>Paste a video link (YouTube works best).</li>
+          <li>Choose how many clips you want.</li>
+          <li>
+            Hit <strong>Create clips</strong> — captions are added automatically.
+          </li>
+        </ol>
       </section>
 
       <section className="panel">
         <input
           className="url"
-          placeholder="Paste a video URL…"
+          placeholder="Paste a video link…"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           disabled={running}
@@ -202,7 +187,7 @@ export default function Home() {
           </label>
         </div>
         <button className="primary" onClick={analyse} disabled={running || !url}>
-          Analyse &amp; generate
+          Create clips
         </button>
       </section>
 
@@ -292,12 +277,36 @@ export default function Home() {
 
       {worker === "offline" ? (
         <p className="footnote">
-          Worker offline. Enter your deployed <strong>Worker URL</strong> above (and
-          token, if set) and click <strong>Save &amp; test</strong>. Once
-          <code>NEXT_PUBLIC_WORKER_URL</code> is configured in Vercel, the link
-          connects automatically.
+          Engine is waking up (it sleeps when idle) or starting up — give it a few
+          seconds and try again. Advanced connection settings are below.
         </p>
       ) : null}
+
+      <details className="advanced">
+        <summary>Advanced — worker connection</summary>
+        <div className="advbody">
+          <label className="lbl">Worker URL</label>
+          <input
+            className="url"
+            placeholder="https://clip-engine-worker.onrender.com"
+            value={workerInput}
+            onChange={(e) => setWorkerInput(e.target.value)}
+          />
+          <label className="lbl">Worker token (only if you set one)</label>
+          <div className="connrow">
+            <input
+              className="url"
+              type="password"
+              placeholder="optional access token"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+            />
+            <button className="ghost" onClick={saveWorker}>
+              Save &amp; test
+            </button>
+          </div>
+        </div>
+      </details>
     </main>
   );
 }

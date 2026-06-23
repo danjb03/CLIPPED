@@ -9,6 +9,18 @@ services:
     plan: standard            # ~2GB RAM for Chrome/ffmpeg render; "starter" may OOM
     autoDeploy: true
     healthCheckPath: /health
+    # Only rebuild the worker when its own code/image changes — not on UI tweaks,
+    # so editing the web app doesn't restart the engine mid-job.
+    buildFilter:
+      paths:
+        - "worker/**"
+        - "Dockerfile"
+        - ".dockerignore"
+        - "render.yaml"
+        - "web/package.json"
+        - "web/package-lock.json"
+        - "web/remotion/**"
+        - "web/remotion.config.ts"
     envVars:
       - key: TRANSCRIBE_BACKEND
         value: assemblyai

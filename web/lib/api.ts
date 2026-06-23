@@ -4,8 +4,11 @@
 // deployed UI can point at any local tunnel (cloudflared/ngrok) you paste in.
 // Priority: localStorage("workerUrl") > NEXT_PUBLIC_WORKER_URL > localhost.
 
+// The hosted worker. onrender.com URLs are stable, so this is the baked-in
+// default — visitors don't need to enter anything. NEXT_PUBLIC_WORKER_URL or the
+// Advanced panel can still override it.
 const ENV_WORKER_URL =
-  process.env.NEXT_PUBLIC_WORKER_URL ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_WORKER_URL ?? "https://clip-engine-worker.onrender.com";
 
 export function getWorkerUrl(): string {
   if (typeof window !== "undefined") {
