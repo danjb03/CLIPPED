@@ -81,7 +81,8 @@ def build_ass(words: List[Dict[str, Any]], style: Dict[str, Any]) -> str:
     outline_w = max(1, round(float(style.get("strokeWidth", 10)) / 2))
     pos_y = float(style.get("position", {}).get("y", 0.78))
     margin_v = max(10, round((1 - pos_y) * H))
-    font = style.get("assFont", "Liberation Sans")
+    # Font must be installed on the worker; libass falls back gracefully if not.
+    font = str(style.get("assFont") or "Liberation Sans").replace("\n", "").replace(",", " ")
 
     primary = _ass_color(primary_hex)
     outline = _ass_color(outline_hex)

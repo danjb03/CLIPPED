@@ -8,12 +8,18 @@ ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
 # Remotion's headless Chrome needs.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv \
-    ffmpeg ca-certificates fonts-liberation \
+    ffmpeg ca-certificates \
+    fonts-liberation fonts-dejavu-core fonts-noto-core \
     libgl1 libglib2.0-0 \
     libnss3 libdbus-1-3 libatk1.0-0 libgbm1 libasound2 \
     libxrandr2 libxkbcommon0 libxfixes3 libxcomposite1 libxdamage1 \
     libatk-bridge2.0-0 libpango-1.0-0 libcairo2 libcups2 \
     && rm -rf /var/lib/apt/lists/*
+
+# Nicer caption fonts (optional — don't fail the build if a package is missing).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-montserrat fonts-open-sans \
+    || true; rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

@@ -7,6 +7,7 @@ import {
   Clip,
   DEFAULT_STYLE,
   fileUrl,
+  FONTS,
 } from "../lib/api";
 
 function fmt(t: number) {
@@ -136,6 +137,19 @@ export function ClipCard({
 
       <details className="styler">
         <summary>Style</summary>
+        <div className="row">
+          <label>Font</label>
+          <select
+            value={style.assFont}
+            onChange={(e) => set({ assFont: e.target.value })}
+          >
+            {FONTS.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="row">
           <label>Text</label>
           <input

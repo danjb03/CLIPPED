@@ -37,6 +37,7 @@ export function setWorkerToken(token: string): void {
 
 export type CaptionStyle = {
   fontFamily: string;
+  assFont: string; // font installed on the worker, used by the ffmpeg burn
   fontSize: number;
   color: string;
   strokeColor: string;
@@ -46,8 +47,18 @@ export type CaptionStyle = {
   position: { x: number; y: number };
 };
 
+// Fonts bundled in the worker container (see Dockerfile).
+export const FONTS = [
+  "Liberation Sans",
+  "Montserrat",
+  "Open Sans",
+  "Noto Sans",
+  "DejaVu Sans",
+];
+
 export const DEFAULT_STYLE: CaptionStyle = {
   fontFamily: "Inter, Arial, sans-serif",
+  assFont: "Liberation Sans",
   fontSize: 84,
   color: "#ffffff",
   strokeColor: "#000000",

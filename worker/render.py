@@ -34,6 +34,7 @@ CROP_FILTER = r"crop=min(iw\,ih*9/16):min(ih\,iw*16/9),scale=1080:1920,setsar=1"
 
 DEFAULT_STYLE: Dict[str, Any] = {
     "fontFamily": "Inter, Arial, sans-serif",
+    "assFont": "Liberation Sans",
     "fontSize": 84,
     "color": "#ffffff",
     "strokeColor": "#000000",

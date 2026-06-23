@@ -358,6 +358,16 @@ button:disabled {
   flex: 1;
 }
 
+.styler .row select {
+  flex: 1;
+  background: #0b0b0f;
+  border: 1px solid #303036;
+  border-radius: 8px;
+  color: #fff;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
 .actions {
   display: flex;
   gap: 8px;
