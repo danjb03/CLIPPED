@@ -186,7 +186,31 @@ button:disabled {
   background: #ffe600;
   color: #0b0b0f;
   border-color: #ffe600;
-  align-self: flex-start;
+}
+
+.createrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.or2 {
+  color: #71717a;
+  font-size: 13px;
+}
+.uploadbtn {
+  cursor: pointer;
+  border: 1px solid #3f3f46;
+  background: #1f1f25;
+  color: #f4f4f5;
+  padding: 10px 16px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.uploadbtn.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .ghost {

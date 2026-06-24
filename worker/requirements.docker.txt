@@ -4,8 +4,10 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-dotenv==1.0.1
 pydantic==2.10.4
+python-multipart==0.0.18
 
-yt-dlp==2025.1.15
+# yt-dlp unpinned: YouTube changes constantly, so always build the latest.
+yt-dlp
 assemblyai==0.37.0
 anthropic==0.42.0
 

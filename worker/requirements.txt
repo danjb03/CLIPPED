@@ -2,9 +2,11 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-dotenv==1.0.1
 pydantic==2.10.4
+python-multipart==0.0.18
 
 # Phase 1 — ingest + transcribe (local, free)
-yt-dlp==2025.1.15
+# yt-dlp unpinned: YouTube changes constantly, so always use the latest.
+yt-dlp
 faster-whisper==1.1.0
 # Diarisation (speaker labels). pyannote pulls in torch/torchaudio.
 pyannote.audio==3.3.2

@@ -57,15 +57,15 @@ export default function Home() {
 
   const running = stage !== null;
 
-  async function analyse() {
+  async function runFrom(getJob: () => Promise<{ job_id: string }>, firstStage: string) {
     setErr(null);
     setClips([]);
     setCarousels([]);
     setExportHref(null);
     setStep(0);
     try {
-      setStage("Downloading video…");
-      const { job_id } = await api.ingest(url);
+      setStage(firstStage);
+      const { job_id } = await getJob();
       setJobId(job_id);
 
       setStep(1);
@@ -92,6 +92,14 @@ export default function Home() {
       setErr(`${STAGES[step] ?? "Pipeline"} failed: ${e}`);
       setStage(null);
     }
+  }
+
+  function analyse() {
+    return runFrom(() => api.ingest(url), "Downloading video…");
+  }
+
+  function uploadFile(file: File) {
+    return runFrom(() => api.upload(file), "Uploading your file…");
   }
 
   async function makeCarousels() {
@@ -186,9 +194,29 @@ export default function Home() {
             <span className="hint">(Phase 4 — falls back to single crop for now)</span>
           </label>
         </div>
-        <button className="primary" onClick={analyse} disabled={running || !url}>
-          Create clips
-        </button>
+        <div className="createrow">
+          <button className="primary" onClick={analyse} disabled={running || !url}>
+            Create clips
+          </button>
+          <span className="or2">or</span>
+          <label className={`uploadbtn${running ? " disabled" : ""}`}>
+            Upload a video file
+            <input
+              type="file"
+              accept="video/*,audio/*"
+              hidden
+              disabled={running}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadFile(f);
+              }}
+            />
+          </label>
+        </div>
+        <p className="hint">
+          YouTube/Drive links are often blocked when downloaded from a server —
+          uploading the file always works.
+        </p>
       </section>
 
       {step >= 0 ? (

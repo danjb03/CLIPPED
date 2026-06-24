@@ -7,7 +7,7 @@ import os as _os
 import subprocess
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -19,7 +19,7 @@ import exporter as export_mod
 import ingest as ingest_mod
 import render as render_mod
 import transcribe as transcribe_mod
-from paths import OUTPUT_DIR, REPO_ROOT
+from paths import OUTPUT_DIR, REPO_ROOT, job_dir, source_path
 
 # .env.local lives at the repo root and is shared with the web app.
 load_dotenv(REPO_ROOT / ".env.local")
@@ -102,6 +102,29 @@ def ingest(req: IngestRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
+    return {"job_id": job_id}
+
+
+@app.post("/upload", dependencies=[Depends(require_token)])
+async def upload(file: UploadFile = File(...)):
+    """Accept a directly-uploaded video file (no yt-dlp). Most reliable input —
+    works regardless of YouTube/Drive blocking."""
+    job_id = ingest_mod.new_job_id()
+    job_dir(job_id).mkdir(parents=True, exist_ok=True)
+    dest = source_path(job_id)
+    try:
+        with open(dest, "wb") as f:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"upload failed: {e}")
+    finally:
+        await file.close()
+    if not dest.exists() or dest.stat().st_size == 0:
+        raise HTTPException(status_code=400, detail="empty upload")
     return {"job_id": job_id}
 
 

@@ -122,6 +122,27 @@ export async function getArtifact<T>(jobId: string, name: string): Promise<T> {
 export const api = {
   health: () => fetch(`${getWorkerUrl()}/health`).then((r) => r.json()),
   ingest: (url: string) => post<{ job_id: string }>("/ingest", { url }),
+  upload: async (file: File): Promise<{ job_id: string }> => {
+    const token = getWorkerToken();
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`${getWorkerUrl()}/upload`, {
+      method: "POST",
+      headers: { ...(token ? { "x-worker-token": token } : {}) },
+      body: fd,
+    });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try {
+        const j = await res.json();
+        if (j?.detail) detail = j.detail;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+    return res.json();
+  },
   transcribe: (jobId: string) =>
     post<{ transcript: string }>("/transcribe", { job_id: jobId }),
   select: (jobId: string, count: number) =>
