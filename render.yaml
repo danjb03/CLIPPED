@@ -37,3 +37,10 @@ services:
         sync: false
       - key: WORKER_TOKEN
         sync: false
+      # Paste exported YouTube cookies (cookies.txt contents) so links download
+      # as a logged-in user instead of being bot-blocked. Optional.
+      - key: YTDLP_COOKIES
+        sync: false
+      # Optional residential/rotating proxy URL for bulletproof link downloads.
+      - key: YTDLP_PROXY
+        sync: false
