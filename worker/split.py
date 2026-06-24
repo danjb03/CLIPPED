@@ -118,34 +118,33 @@ def detect_face_centers(
     src: str, start: float, duration: float, n: int = SAMPLE_COUNT
 ) -> Tuple[List[Center], int, int]:
     """Sample n frames in [start, start+duration] and return normalised face
-    centers plus the frame (w, h). Lazy-imports cv2 + mediapipe."""
+    centers plus the frame (w, h). Uses OpenCV's Haar cascade (lightweight — no
+    mediapipe/jax)."""
     import cv2  # type: ignore
-    import mediapipe as mp  # type: ignore
 
     cap = cv2.VideoCapture(str(src))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 0
     frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 0
 
-    centers: List[Center] = []
-    detector = mp.solutions.face_detection.FaceDetection(
-        model_selection=1, min_detection_confidence=0.5
+    cascade = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
     )
-    try:
-        for i in range(n):
-            t = start + duration * (i + 0.5) / n
-            cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
-            ok, frame = cap.read()
-            if not ok:
-                continue
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            res = detector.process(rgb)
-            for det in res.detections or []:
-                box = det.location_data.relative_bounding_box
-                centers.append((box.xmin + box.width / 2, box.ymin + box.height / 2))
-    finally:
-        detector.close()
-        cap.release()
+    min_side = max(40, int((frame_h or 1080) * 0.08))
+
+    centers: List[Center] = []
+    for i in range(n):
+        t = start + duration * (i + 0.5) / n
+        cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
+        ok, frame = cap.read()
+        if not ok:
+            continue
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = cascade.detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=5, minSize=(min_side, min_side)
+        )
+        for (x, y, w, h) in faces:
+            centers.append(((x + w / 2) / frame_w, (y + h / 2) / frame_h))
+    cap.release()
     return centers, frame_w, frame_h
 
 
