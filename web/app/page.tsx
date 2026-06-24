@@ -13,10 +13,21 @@ import {
   setWorkerToken,
   setWorkerUrl,
 } from "../lib/api";
+import {
+  Draft,
+  getDrafts,
+  removeDraft,
+  saveDraft,
+  updateDraft,
+} from "../lib/drafts";
 
 type WorkerStatus = "checking" | "online" | "offline";
 
 const STAGES = ["Download", "Transcribe", "Select", "Render", "Copy"];
+
+function fmtBytes(n: number): string {
+  return n >= 1e9 ? `${(n / 1e9).toFixed(2)}GB` : `${Math.round(n / 1e6)}MB`;
+}
 
 export default function Home() {
   const [worker, setWorker] = useState<WorkerStatus>("checking");
@@ -34,6 +45,9 @@ export default function Home() {
   const [tokenInput, setTokenInput] = useState("");
   const [creator, setCreator] = useState("");
   const [step, setStep] = useState(-1);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  // the source we can re-run from (last uploaded/processed job)
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
 
   function checkHealth() {
     setWorker("checking");
@@ -46,6 +60,7 @@ export default function Home() {
   useEffect(() => {
     setWorkerInput(getWorkerUrl());
     setTokenInput(getWorkerToken());
+    setDrafts(getDrafts());
     checkHealth();
   }, []);
 
@@ -57,7 +72,7 @@ export default function Home() {
 
   const running = stage !== null;
 
-  async function pollRun(runId: string) {
+  async function pollRun(runId: string, name: string) {
     // Poll the worker for status until done/error. The pipeline runs in the
     // background on the worker, so the browser never holds a long request open.
     while (true) {
@@ -70,40 +85,45 @@ export default function Home() {
       }
       setStep(s.step);
       setStage(s.stage ? `${s.stage}…` : null);
-      if (s.job_id) setJobId(s.job_id);
+      if (s.job_id) {
+        setJobId(s.job_id);
+        setLastJobId(s.job_id);
+        // remember this source as a draft the moment we know its job_id
+        setDrafts(saveDraft({ jobId: s.job_id, name, createdAt: Date.now(), status: "uploaded" }));
+      }
       if (s.state === "done") {
         const loaded = await getArtifact<Clip[]>(s.job_id!, "clips.json");
         setClips(loaded);
         setStep(s.stages.length);
         setStage(null);
+        if (s.job_id) setDrafts(updateDraft(s.job_id, { status: "done" }));
         return;
       }
       if (s.state === "error") {
         setErr(s.error || "Pipeline failed");
         setStage(null);
+        if (s.job_id) setDrafts(updateDraft(s.job_id, { status: "error" }));
         return;
       }
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
 
-  async function startRun(body: {
-    url?: string;
-    job_id?: string;
-  }) {
+  async function startRun(body: { url?: string; job_id?: string }, name: string) {
     setErr(null);
     setClips([]);
     setCarousels([]);
     setExportHref(null);
     setStep(0);
     setStage("Starting…");
+    if (body.job_id) setLastJobId(body.job_id);
     try {
       const { run_id } = await api.run({
         ...body,
         count,
         mode: splitScreen ? "split" : "single",
       });
-      await pollRun(run_id);
+      await pollRun(run_id, name);
     } catch (e) {
       setErr(String(e));
       setStage(null);
@@ -111,20 +131,39 @@ export default function Home() {
   }
 
   function analyse() {
-    return startRun({ url });
+    return startRun({ url }, url);
+  }
+
+  function retry() {
+    if (lastJobId) startRun({ job_id: lastJobId }, lastJobId);
   }
 
   async function uploadFile(file: File) {
     setErr(null);
-    setStage("Uploading your file…");
+    setClips([]);
+    setCarousels([]);
     setStep(0);
+    setStage("Uploading 0%…");
     try {
-      const { job_id } = await api.upload(file);
-      await startRun({ job_id });
+      const { job_id } = await api.uploadProgress(file, (pct, loaded, total) => {
+        setStage(`Uploading ${Math.round(pct * 100)}% (${fmtBytes(loaded)} / ${fmtBytes(total)})`);
+      });
+      setLastJobId(job_id);
+      setDrafts(saveDraft({ jobId: job_id, name: file.name, createdAt: Date.now(), status: "uploaded" }));
+      await startRun({ job_id }, file.name);
     } catch (e) {
       setErr(`Upload failed: ${e}`);
       setStage(null);
     }
+  }
+
+  function resumeDraft(d: Draft) {
+    setUrl("");
+    startRun({ job_id: d.jobId }, d.name);
+  }
+
+  function deleteDraft(jobId: string) {
+    setDrafts(removeDraft(jobId));
   }
 
   async function makeCarousels() {
@@ -260,7 +299,16 @@ export default function Home() {
         </ol>
       ) : null}
       {stage ? <p className="stage">⏳ {stage}</p> : null}
-      {err ? <p className="stage err">⚠ {err}</p> : null}
+      {err ? (
+        <div className="errbox">
+          <p className="stage err">⚠ {err}</p>
+          {lastJobId && !running ? (
+            <button className="ghost" onClick={retry}>
+              ↻ Retry (your file is saved — no re-upload)
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {clips.length > 0 ? (
         <>
@@ -325,6 +373,44 @@ export default function Home() {
               </div>
             </div>
           ))}
+        </section>
+      ) : null}
+
+      {drafts.length > 0 ? (
+        <section className="drafts">
+          <h2>Drafts</h2>
+          <p className="hint">
+            Previously uploaded/processed sources. Re-run any of them without
+            re-uploading.
+          </p>
+          <ul className="draftlist">
+            {drafts.map((d) => (
+              <li key={d.jobId} className="draftrow">
+                <span className={`ddot ${d.status ?? ""}`} />
+                <span className="dname" title={d.name}>
+                  {d.name || d.jobId}
+                </span>
+                <span className="dmeta">
+                  {new Date(d.createdAt).toLocaleString()}
+                </span>
+                <button
+                  className="ghost"
+                  onClick={() => resumeDraft(d)}
+                  disabled={running}
+                >
+                  Create clips
+                </button>
+                <button
+                  className="ghost del"
+                  onClick={() => deleteDraft(d.jobId)}
+                  disabled={running}
+                  title="Remove from list"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 

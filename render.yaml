@@ -9,6 +9,12 @@ services:
     plan: standard            # ~2GB RAM for Chrome/ffmpeg render; "starter" may OOM
     autoDeploy: true
     healthCheckPath: /health
+    # Persist uploaded sources + renders across restarts/deploys, so "Drafts"
+    # remain re-runnable.
+    disk:
+      name: clip-output
+      mountPath: /app/output
+      sizeGB: 10
     # Only rebuild the worker when its own code/image changes — not on UI tweaks,
     # so editing the web app doesn't restart the engine mid-job.
     buildFilter:

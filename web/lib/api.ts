@@ -165,6 +165,42 @@ export const api = {
     }
     return res.json();
   },
+  // Upload with progress — uses XHR because fetch() can't report upload bytes.
+  uploadProgress: (
+    file: File,
+    onProgress: (pct: number, loaded: number, total: number) => void
+  ): Promise<{ job_id: string }> =>
+    new Promise((resolve, reject) => {
+      const token = getWorkerToken();
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${getWorkerUrl()}/upload`);
+      if (token) xhr.setRequestHeader("x-worker-token", token);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded / e.total, e.loaded, e.total);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            reject(new Error("bad response from worker"));
+          }
+        } else {
+          let detail = `${xhr.status}`;
+          try {
+            const j = JSON.parse(xhr.responseText);
+            if (j?.detail) detail = j.detail;
+          } catch {
+            /* ignore */
+          }
+          reject(new Error(detail));
+        }
+      };
+      xhr.onerror = () => reject(new Error("network error during upload"));
+      const fd = new FormData();
+      fd.append("file", file);
+      xhr.send(fd);
+    }),
   transcribe: (jobId: string) =>
     post<{ transcript: string }>("/transcribe", { job_id: jobId }),
   select: (jobId: string, count: number) =>
