@@ -57,49 +57,74 @@ export default function Home() {
 
   const running = stage !== null;
 
-  async function runFrom(getJob: () => Promise<{ job_id: string }>, firstStage: string) {
+  async function pollRun(runId: string) {
+    // Poll the worker for status until done/error. The pipeline runs in the
+    // background on the worker, so the browser never holds a long request open.
+    while (true) {
+      let s;
+      try {
+        s = await api.jobStatus(runId);
+      } catch {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      setStep(s.step);
+      setStage(s.stage ? `${s.stage}…` : null);
+      if (s.job_id) setJobId(s.job_id);
+      if (s.state === "done") {
+        const loaded = await getArtifact<Clip[]>(s.job_id!, "clips.json");
+        setClips(loaded);
+        setStep(s.stages.length);
+        setStage(null);
+        return;
+      }
+      if (s.state === "error") {
+        setErr(s.error || "Pipeline failed");
+        setStage(null);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+
+  async function startRun(body: {
+    url?: string;
+    job_id?: string;
+  }) {
     setErr(null);
     setClips([]);
     setCarousels([]);
     setExportHref(null);
     setStep(0);
+    setStage("Starting…");
     try {
-      setStage(firstStage);
-      const { job_id } = await getJob();
-      setJobId(job_id);
-
-      setStep(1);
-      setStage("Transcribing + diarising (this can take a while)…");
-      await api.transcribe(job_id);
-
-      setStep(2);
-      setStage("Selecting the best moments…");
-      await api.select(job_id, count);
-
-      setStep(3);
-      setStage("Rendering captioned clips…");
-      await api.render(job_id, splitScreen ? "split" : "single");
-
-      setStep(4);
-      setStage("Writing post copy…");
-      await api.copy(job_id);
-
-      const loaded = await getArtifact<Clip[]>(job_id, "clips.json");
-      setClips(loaded);
-      setStep(STAGES.length);
-      setStage(null);
+      const { run_id } = await api.run({
+        ...body,
+        count,
+        mode: splitScreen ? "split" : "single",
+      });
+      await pollRun(run_id);
     } catch (e) {
-      setErr(`${STAGES[step] ?? "Pipeline"} failed: ${e}`);
+      setErr(String(e));
       setStage(null);
     }
   }
 
   function analyse() {
-    return runFrom(() => api.ingest(url), "Downloading video…");
+    return startRun({ url });
   }
 
-  function uploadFile(file: File) {
-    return runFrom(() => api.upload(file), "Uploading your file…");
+  async function uploadFile(file: File) {
+    setErr(null);
+    setStage("Uploading your file…");
+    setStep(0);
+    try {
+      const { job_id } = await api.upload(file);
+      await startRun({ job_id });
+    } catch (e) {
+      setErr(`Upload failed: ${e}`);
+      setStage(null);
+    }
   }
 
   async function makeCarousels() {

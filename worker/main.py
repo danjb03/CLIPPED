@@ -6,8 +6,10 @@ Routes: /health, /ingest, /transcribe, /select, /render, /copy, /export.
 import os as _os
 import subprocess
 
+import uuid
+
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -17,6 +19,7 @@ import clipselect as select_mod
 import copygen as copy_mod
 import exporter as export_mod
 import ingest as ingest_mod
+import jobs as jobs_mod
 import render as render_mod
 import transcribe as transcribe_mod
 from paths import OUTPUT_DIR, REPO_ROOT, job_dir, source_path
@@ -92,6 +95,62 @@ class RegenerateRequest(BaseModel):
 class CarouselRequest(BaseModel):
     job_id: str
     creator: str | None = None  # speaker label of the creator (-> "Neil")
+
+
+class RunRequest(BaseModel):
+    url: str | None = None         # paste-link path; ignored if job_id given
+    job_id: str | None = None      # use an existing source (e.g. just uploaded)
+    count: int = 3
+    mode: str = "single"           # "single" | "split"
+
+
+def _pipeline_steps(req: RunRequest):
+    """Build the (label, fn) sequence the background runner walks."""
+
+    def do_download(j):
+        if req.job_id:
+            j.job_id = req.job_id
+        else:
+            j.job_id = ingest_mod.download(req.url or "")
+
+    def do_transcribe(j):
+        transcribe_mod.transcribe(j.job_id)
+
+    def do_select(j):
+        if req.count < 1:
+            raise ValueError("count must be >= 1")
+        select_mod.select(j.job_id, req.count)
+
+    def do_render(j):
+        render_mod.render(j.job_id, mode=req.mode)
+
+    def do_copy(j):
+        copy_mod.generate_copy(j.job_id)
+
+    return [
+        ("Download", do_download),
+        ("Transcribe", do_transcribe),
+        ("Select", do_select),
+        ("Render", do_render),
+        ("Copy", do_copy),
+    ]
+
+
+@app.post("/run", dependencies=[Depends(require_token)])
+def run(req: RunRequest, bg: BackgroundTasks):
+    """Start the full pipeline as a background job; return run_id immediately."""
+    run_id = uuid.uuid4().hex[:12]
+    jobs_mod.create(run_id, job_id=req.job_id)
+    bg.add_task(jobs_mod.run_pipeline, run_id, _pipeline_steps(req))
+    return {"run_id": run_id}
+
+
+@app.get("/jobs/{run_id}")
+def job_status(run_id: str):
+    j = jobs_mod.get(run_id)
+    if not j:
+        raise HTTPException(status_code=404, detail="run not found")
+    return j.to_dict()
 
 
 @app.post("/ingest", dependencies=[Depends(require_token)])

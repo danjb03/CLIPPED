@@ -119,9 +119,31 @@ export async function getArtifact<T>(jobId: string, name: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export type RunStatus = {
+  id: string;
+  step: number;
+  state: "pending" | "running" | "done" | "error";
+  stage: string | null;
+  error: string | null;
+  job_id: string | null;
+  stages: string[];
+  elapsed: number;
+};
+
 export const api = {
   health: () => fetch(`${getWorkerUrl()}/health`).then((r) => r.json()),
   ingest: (url: string) => post<{ job_id: string }>("/ingest", { url }),
+  run: (body: {
+    url?: string;
+    job_id?: string;
+    count: number;
+    mode: "single" | "split";
+  }) => post<{ run_id: string }>("/run", body),
+  jobStatus: async (runId: string): Promise<RunStatus> => {
+    const res = await fetch(`${getWorkerUrl()}/jobs/${runId}?t=${Date.now()}`);
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    return res.json();
+  },
   upload: async (file: File): Promise<{ job_id: string }> => {
     const token = getWorkerToken();
     const fd = new FormData();
