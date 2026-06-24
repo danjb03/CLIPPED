@@ -515,7 +515,7 @@ button:disabled {
 
 .slide {
   width: 200px;
-  aspect-ratio: 1080 / 1350;
+  aspect-ratio: 9 / 16;
   border-radius: 10px;
   border: 1px solid #27272a;
   flex: 0 0 auto;

@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import carousel as carousel_mod
+import carousel_render as carousel_render_mod
 import clipselect as select_mod
 import copygen as copy_mod
 import exporter as export_mod
@@ -287,7 +288,9 @@ def carousels(req: CarouselRequest):
 @app.post("/carousels/render", dependencies=[Depends(require_token)])
 def render_carousels(req: JobRequest):
     try:
-        outputs = render_mod.render_carousels(req.job_id)
+        # Split-screen image carousels: two podcast frames stacked + the matching
+        # sentence overlaid on each panel (what the storyline prompt targets).
+        outputs = carousel_render_mod.render_split_carousels(req.job_id)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except subprocess.CalledProcessError as e:
