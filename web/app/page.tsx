@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CarouselEditor } from "./CarouselEditor";
 import { ClipCard } from "./ClipCard";
 import {
   api,
-  Carousel,
+  CarouselManifest,
   Clip,
   fileUrl,
   getArtifact,
@@ -37,7 +38,7 @@ export default function Home() {
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [clips, setClips] = useState<Clip[]>([]);
-  const [carousels, setCarousels] = useState<Carousel[]>([]);
+  const [carousels, setCarousels] = useState<CarouselManifest[]>([]);
   const [stage, setStage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [exportHref, setExportHref] = useState<string | null>(null);
@@ -172,10 +173,9 @@ export default function Home() {
     try {
       setStage("Generating carousels…");
       await api.carousels(jobId, creator);
-      setStage("Rendering carousel slides…");
-      await api.renderCarousels(jobId);
-      const loaded = await getArtifact<Carousel[]>(jobId, "carousels.json");
-      setCarousels(loaded);
+      setStage("Building split-screen slides…");
+      const { carousels: manifest } = await api.renderCarousels(jobId);
+      setCarousels(manifest);
       setStage(null);
     } catch (e) {
       setErr(String(e));
@@ -354,26 +354,7 @@ export default function Home() {
       ) : null}
 
       {carousels.length > 0 && jobId ? (
-        <section className="carousels">
-          <h2>Carousels</h2>
-          {carousels.map((c) => (
-            <div key={c.number} className="carousel">
-              <p className="ctitle">
-                Carousel {c.number}: {c.title}
-              </p>
-              <div className="slides">
-                {c.slides.map((_, i) => (
-                  <img
-                    key={i}
-                    className="slide"
-                    alt={`carousel ${c.number} slide ${i + 1}`}
-                    src={fileUrl(jobId, `carousels/carousel_${c.number}/slide_${i + 1}.png`)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </section>
+        <CarouselEditor jobId={jobId} carousels={carousels} />
       ) : null}
 
       {drafts.length > 0 ? (

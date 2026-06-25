@@ -163,8 +163,27 @@ def build_slide(
                 f.unlink()
 
 
-def render_split_carousels(job_id: str) -> List[str]:
-    """Render every carousel slide as a 1080x1920 split-screen PNG."""
+def _manifest_path(job_id: str) -> Path:
+    return job_dir(job_id) / "carousels" / "manifest.json"
+
+
+def load_manifest(job_id: str) -> List[Dict[str, Any]]:
+    p = _manifest_path(job_id)
+    return json.loads(p.read_text()) if p.exists() else []
+
+
+def save_manifest(job_id: str, manifest: List[Dict[str, Any]]) -> None:
+    p = _manifest_path(job_id)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+
+
+def render_split_carousels(job_id: str) -> List[Dict[str, Any]]:
+    """Render every carousel slide as a 1080x1920 split-screen PNG.
+
+    Returns (and persists) a manifest with the editable fields per slide:
+    top/bottom text, the two timestamps, and the relative image path.
+    """
     src = source_path(job_id)
     if not src.exists():
         raise FileNotFoundError(f"source.mp4 not found for job {job_id}")
@@ -175,17 +194,67 @@ def render_split_carousels(job_id: str) -> List[str]:
     carousels = json.loads(cjson.read_text())
 
     base = job_dir(job_id) / "carousels"
-    outputs: List[str] = []
-    for c in carousels:
-        n = c.get("number", len(outputs) + 1)
+    manifest: List[Dict[str, Any]] = []
+    for ci, c in enumerate(carousels):
+        n = c.get("number", ci + 1)
         slides = c.get("slides", [])
         cdir = base / f"carousel_{n}"
         cdir.mkdir(parents=True, exist_ok=True)
+        slide_entries: List[Dict[str, Any]] = []
         for i, slide_text in enumerate(slides, start=1):
             top_text, bot_text = split_sentences(slide_text)
             t_top = find_sentence_time(top_text, transcript)
             t_bot = find_sentence_time(bot_text, transcript)
-            out = cdir / f"slide_{i}.png"
-            build_slide(src, t_top, t_bot, top_text, bot_text, out)
-            outputs.append(str(out))
-    return outputs
+            rel = f"carousel_{n}/slide_{i}.png"
+            build_slide(src, t_top, t_bot, top_text, bot_text, cdir / f"slide_{i}.png")
+            slide_entries.append(
+                {
+                    "index": i,
+                    "top_text": top_text,
+                    "bottom_text": bot_text,
+                    "t_top": round(t_top, 3),
+                    "t_bottom": round(t_bot, 3),
+                    "file": rel,
+                }
+            )
+        manifest.append({"number": n, "title": c.get("title", ""), "slides": slide_entries})
+
+    save_manifest(job_id, manifest)
+    return manifest
+
+
+def render_one_slide(
+    job_id: str,
+    number: int,
+    index: int,
+    top_text: str,
+    bottom_text: str,
+    t_top: float,
+    t_bottom: float,
+) -> Dict[str, Any]:
+    """Re-render a single carousel slide with explicit text + timestamps, and
+    update the manifest. Returns the updated slide entry."""
+    src = source_path(job_id)
+    if not src.exists():
+        raise FileNotFoundError(f"source.mp4 not found for job {job_id}")
+    cdir = job_dir(job_id) / "carousels" / f"carousel_{number}"
+    out = cdir / f"slide_{index}.png"
+    build_slide(src, t_top, t_bottom, top_text, bottom_text, out)
+
+    entry = {
+        "index": index,
+        "top_text": top_text,
+        "bottom_text": bottom_text,
+        "t_top": round(t_top, 3),
+        "t_bottom": round(t_bottom, 3),
+        "file": f"carousel_{number}/slide_{index}.png",
+    }
+    manifest = load_manifest(job_id)
+    for c in manifest:
+        if c.get("number") == number:
+            c["slides"] = [s for s in c.get("slides", []) if s.get("index") != index]
+            c["slides"].append(entry)
+            c["slides"].sort(key=lambda s: s["index"])
+            break
+    save_manifest(job_id, manifest)
+    return entry

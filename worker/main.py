@@ -285,19 +285,46 @@ def carousels(req: CarouselRequest):
     return {"job_id": req.job_id, "carousels": path}
 
 
+class SlideRequest(BaseModel):
+    job_id: str
+    number: int
+    index: int
+    top_text: str
+    bottom_text: str
+    t_top: float
+    t_bottom: float
+
+
 @app.post("/carousels/render", dependencies=[Depends(require_token)])
 def render_carousels(req: JobRequest):
     try:
         # Split-screen image carousels: two podcast frames stacked + the matching
         # sentence overlaid on each panel (what the storyline prompt targets).
-        outputs = carousel_render_mod.render_split_carousels(req.job_id)
+        manifest = carousel_render_mod.render_split_carousels(req.job_id)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=e.stderr or str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {"job_id": req.job_id, "slides": outputs}
+    return {"job_id": req.job_id, "carousels": manifest}
+
+
+@app.post("/carousels/slide", dependencies=[Depends(require_token)])
+def render_slide(req: SlideRequest):
+    """Re-render one slide with edited text / a swapped frame timestamp."""
+    try:
+        entry = carousel_render_mod.render_one_slide(
+            req.job_id, req.number, req.index,
+            req.top_text, req.bottom_text, req.t_top, req.t_bottom,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=e.stderr or str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"job_id": req.job_id, "slide": entry}
 
 
 @app.post("/export", dependencies=[Depends(require_token)])

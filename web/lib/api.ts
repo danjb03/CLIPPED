@@ -222,7 +222,33 @@ export const api = {
       creator: creator || null,
     }),
   renderCarousels: (jobId: string) =>
-    post<{ slides: string[] }>("/carousels/render", { job_id: jobId }),
+    post<{ carousels: CarouselManifest[] }>("/carousels/render", { job_id: jobId }),
+  renderSlide: (jobId: string, s: SlideEdit) =>
+    post<{ slide: SlideEntry }>("/carousels/slide", { job_id: jobId, ...s }),
   exportZip: (jobId: string) =>
     post<{ export: string }>("/export", { job_id: jobId }),
+};
+
+export type SlideEntry = {
+  index: number;
+  top_text: string;
+  bottom_text: string;
+  t_top: number;
+  t_bottom: number;
+  file: string;
+};
+
+export type CarouselManifest = {
+  number: number;
+  title: string;
+  slides: SlideEntry[];
+};
+
+export type SlideEdit = {
+  number: number;
+  index: number;
+  top_text: string;
+  bottom_text: string;
+  t_top: number;
+  t_bottom: number;
 };

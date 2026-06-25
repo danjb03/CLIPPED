@@ -521,6 +521,62 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+.slidegrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+.slidecard {
+  display: flex;
+  gap: 12px;
+  background: #131318;
+  border: 1px solid #27272a;
+  border-radius: 12px;
+  padding: 12px;
+}
+.slideimg {
+  width: 120px;
+  aspect-ratio: 9 / 16;
+  border-radius: 8px;
+  background: #000;
+  flex: 0 0 auto;
+  object-fit: cover;
+}
+.slidefields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.slidefields textarea {
+  width: 100%;
+  background: #0b0b0f;
+  border: 1px solid #303036;
+  border-radius: 8px;
+  color: #fff;
+  padding: 7px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+.framerow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+.framerow button.sm,
+button.sm,
+.dl.sm {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+.framerow .sm {
+  min-width: 30px;
+}
+
 .footnote {
   margin-top: 40px;
   color: #71717a;
