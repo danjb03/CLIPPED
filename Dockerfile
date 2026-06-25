@@ -17,8 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Nicer caption fonts (optional — don't fail the build if a package is missing).
+# Open Sans is the carousel default (close to the iOS reference); Inter is the
+# open-source SF Pro alternative — even closer; Montserrat for variety.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-montserrat fonts-open-sans \
+    && apt-get install -y --no-install-recommends fonts-montserrat fonts-open-sans fonts-inter \
     || true; rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

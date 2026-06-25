@@ -28,8 +28,11 @@ PANEL_ASPECT = PANEL_W / PANEL_H  # 1.125
 
 # Captions are rendered via libass (the same engine clip captions use), not
 # drawtext — better anti-aliasing/wrap and the filter is universally available.
-FONT_NAME = "DejaVu Sans"
-CAPTION_Y_FRAC = 0.78  # caption baseline as fraction of panel height
+# Open Sans matches the iOS-style look in the creator's reference images much
+# better than DejaVu Sans. Both are installed in the worker image.
+FONT_NAME = "Open Sans"
+FONT_SIZE = 48
+CAPTION_Y_FRAC = 0.82  # caption baseline as fraction of panel height
 
 
 # --- Pure, testable helpers (no ffmpeg) ---
@@ -111,8 +114,8 @@ def build_panel_ass(text: str) -> str:
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, "
         "ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, "
         "MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Cap,{FONT_NAME},54,&H00FFFFFF,&H00FFFFFF,&H00000000,"
-        f"&H64000000,-1,0,0,0,100,100,0,0,1,3,2,2,60,60,{margin_v},1\n\n"
+        f"Style: Cap,{FONT_NAME},{FONT_SIZE},&H00FFFFFF,&H00FFFFFF,&H00000000,"
+        f"&H64000000,-1,0,0,0,100,100,0,0,1,2,1,2,60,60,{margin_v},1\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
         "Effect, Text\n"

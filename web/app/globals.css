@@ -577,6 +577,110 @@ button.sm,
   min-width: 30px;
 }
 
+.thumbbtn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: zoom-in;
+}
+.labelrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.charcount {
+  font-size: 11px;
+  color: #71717a;
+}
+.charcount.over {
+  color: #ef4444;
+  font-weight: 700;
+}
+.actionrow {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.chead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* Lightbox */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+.lbinner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  max-height: 100%;
+}
+.lbimg {
+  max-width: min(540px, 60vw);
+  max-height: 86vh;
+  border-radius: 12px;
+  background: #000;
+}
+.lbnav {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  font-size: 38px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lbnav:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+.lbclose {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #1f1f25;
+  color: #fff;
+  border: 1px solid #3f3f46;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+}
+.lbbar {
+  position: absolute;
+  bottom: -52px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #d4d4d8;
+  font-size: 13px;
+}
+
 .footnote {
   margin-top: 40px;
   color: #71717a;

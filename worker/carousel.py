@@ -44,7 +44,17 @@ Prioritise moments where Neil:
 - Drops a specific number, result, or timeline
 - Says something that would make someone stop and think
 
-Do not repeat the same idea across carousels. Each one should feel like a standalone story."""
+Do not repeat the same idea across carousels. Each one should feel like a standalone story.
+
+VIRALITY RANKING — IMPORTANT:
+Rank the carousels by viral / scroll-stopping potential. Carousel 1 must be the
+strongest hook (most likely to stop someone mid-scroll), Carousel 2 the next
+strongest, and so on. Push the weakest to the bottom.
+
+CHARACTER LIMITS:
+Keep every single sentence under 80 characters (including spaces). Cut filler
+words. Aim for punchy, short. If a quote is longer in the transcript, condense
+to its core while keeping the exact meaning and creator's voice."""
 
 
 # --- Pure, testable helpers (no API, no IO) ---
