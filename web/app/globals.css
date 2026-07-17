@@ -271,6 +271,20 @@ button:disabled {
   opacity: 0.5;
   pointer-events: none;
 }
+.uploadbtn.primarylike {
+  background: #ffe600;
+  color: #0b0b0f;
+  border-color: #ffe600;
+  font-weight: 700;
+}
+.framerow select {
+  background: #0b0b0f;
+  border: 1px solid #303036;
+  border-radius: 7px;
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 12px;
+}
 
 .ghost {
   background: transparent;

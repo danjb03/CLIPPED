@@ -25,6 +25,24 @@ def build_captions_txt(clips: List[Dict[str, Any]]) -> str:
     return "\n\n".join(blocks) + "\n"
 
 
+def export_carousels(job_id: str) -> str:
+    """Zip only the carousel slide PNGs (+ carousels.txt) into carousels.zip."""
+    jd = job_dir(job_id)
+    carousels_dir = jd / "carousels"
+    pngs = sorted(carousels_dir.rglob("*.png")) if carousels_dir.exists() else []
+    if not pngs:
+        raise FileNotFoundError(f"no carousel slides found for job {job_id}")
+
+    zip_path = jd / "carousels.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for png in pngs:
+            z.write(png, arcname=str(png.relative_to(carousels_dir)))
+        txt = jd / "carousels.txt"
+        if txt.exists():
+            z.write(txt, arcname="carousels.txt")
+    return str(zip_path)
+
+
 def export(job_id: str) -> str:
     """Zip renders/*.mp4 + captions.txt into export.zip; return its path."""
     jd = job_dir(job_id)

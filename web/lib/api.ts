@@ -138,7 +138,29 @@ export const api = {
     job_id?: string;
     count: number;
     mode: "single" | "split";
+    make_clips: boolean;
+    creator?: string | null;
   }) => post<{ run_id: string }>("/run", body),
+  carouselsRun: (jobId: string, creator?: string) =>
+    post<{ run_id: string }>("/carousels/run", {
+      job_id: jobId,
+      creator: creator || null,
+    }),
+  drafts: async (): Promise<{ drafts: ServerDraft[] }> => {
+    const res = await fetch(`${getWorkerUrl()}/drafts?t=${Date.now()}`);
+    if (!res.ok) throw new Error(`drafts ${res.status}`);
+    return res.json();
+  },
+  deleteDraft: async (jobId: string): Promise<void> => {
+    const token = getWorkerToken();
+    const res = await fetch(`${getWorkerUrl()}/drafts/${jobId}`, {
+      method: "DELETE",
+      headers: { ...(token ? { "x-worker-token": token } : {}) },
+    });
+    if (!res.ok) throw new Error(`delete ${res.status}`);
+  },
+  exportCarousels: (jobId: string) =>
+    post<{ export: string }>("/export/carousels", { job_id: jobId }),
   jobStatus: async (runId: string): Promise<RunStatus> => {
     const res = await fetch(`${getWorkerUrl()}/jobs/${runId}?t=${Date.now()}`);
     if (!res.ok) throw new Error(`status ${res.status}`);
@@ -251,4 +273,14 @@ export type SlideEdit = {
   bottom_text: string;
   t_top: number;
   t_bottom: number;
+  font_size?: number;
+};
+
+export type ServerDraft = {
+  job_id: string;
+  name: string;
+  created: number; // unix seconds
+  has_transcript: boolean;
+  has_carousels: boolean;
+  has_clips: boolean;
 };

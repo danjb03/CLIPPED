@@ -75,6 +75,62 @@ def find_sentence_time(sentence: str, transcript: List[Dict[str, Any]]) -> float
     return float(transcript[best_idx]["start"])
 
 
+def best_candidate(candidates: List[Tuple[float, float, float]]) -> float:
+    """Pick the best (t, face_frac, sharpness) candidate.
+
+    face_frac: largest detected face area as a fraction of the frame (0 if none).
+    sharpness: Laplacian variance (any positive scale — normalised within the set).
+    Faces dominate the score; sharpness breaks ties and rescues no-face sets.
+    """
+    if not candidates:
+        return 0.0
+    max_sharp = max(c[2] for c in candidates) or 1.0
+    best_t, best_score = candidates[0][0], -1.0
+    for t, face_frac, sharp in candidates:
+        score = 3.0 * min(face_frac, 0.2) / 0.2 + (sharp / max_sharp)
+        if score > best_score:
+            best_score, best_t = score, t
+    return best_t
+
+
+def pick_best_frame(
+    src: Path, t_center: float, window: float = 1.5, samples: int = 9
+) -> float:
+    """Sample frames in [t_center, t_center + window] and return the timestamp of
+    the best-looking one: a clearly visible face, as sharp as possible.
+
+    Sampled forward from the sentence start (that's when the speaker is talking).
+    Falls back to t_center on any failure — never raises.
+    """
+    try:
+        import cv2  # type: ignore
+
+        cap = cv2.VideoCapture(str(src))
+        cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        )
+        candidates: List[Tuple[float, float, float]] = []
+        for i in range(samples):
+            t = max(0.0, t_center + window * i / max(1, samples - 1))
+            cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
+            ok, frame = cap.read()
+            if not ok:
+                continue
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            fh, fw = gray.shape[:2]
+            faces = cascade.detectMultiScale(
+                gray, scaleFactor=1.1, minNeighbors=5,
+                minSize=(max(30, fh // 12), max(30, fh // 12)),
+            )
+            face_frac = max(((w * h) / (fw * fh) for (_, _, w, h) in faces), default=0.0)
+            sharp = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+            candidates.append((t, face_frac, sharp))
+        cap.release()
+        return best_candidate(candidates) if candidates else t_center
+    except Exception:
+        return t_center
+
+
 def wrap(text: str, max_chars: int = 36) -> str:
     """Naive word-wrap so long sentences break onto a second line."""
     words = text.split()
@@ -98,7 +154,7 @@ def _ass_escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("{", "(").replace("}", ")")
 
 
-def build_panel_ass(text: str) -> str:
+def build_panel_ass(text: str, font_size: int = FONT_SIZE) -> str:
     """Single-event ASS that holds `text` on screen for the whole panel duration."""
     margin_v = max(10, round((1 - CAPTION_Y_FRAC) * PANEL_H))
     text = _ass_escape(text).replace("\n", "\\N")
@@ -114,7 +170,7 @@ def build_panel_ass(text: str) -> str:
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, "
         "ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, "
         "MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Cap,{FONT_NAME},{FONT_SIZE},&H00FFFFFF,&H00FFFFFF,&H00000000,"
+        f"Style: Cap,{FONT_NAME},{font_size},&H00FFFFFF,&H00FFFFFF,&H00000000,"
         f"&H64000000,-1,0,0,0,100,100,0,0,1,2,1,2,60,60,{margin_v},1\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
@@ -135,13 +191,14 @@ def build_slide(
     text_top: str,
     text_bottom: str,
     out: Path,
+    font_size: int = FONT_SIZE,
 ) -> None:
     """Render one carousel PNG: top frame (with text) over bottom frame (with text)."""
     out.parent.mkdir(parents=True, exist_ok=True)
     top_ass = out.parent / f".top_{out.stem}.ass"
     bot_ass = out.parent / f".bot_{out.stem}.ass"
-    top_ass.write_text(build_panel_ass(text_top))
-    bot_ass.write_text(build_panel_ass(text_bottom))
+    top_ass.write_text(build_panel_ass(text_top, font_size))
+    bot_ass.write_text(build_panel_ass(text_bottom, font_size))
     try:
         crop = (
             f"crop=min(iw\\,ih*{PANEL_ASPECT}):min(ih\\,iw/{PANEL_ASPECT}),"
@@ -206,8 +263,10 @@ def render_split_carousels(job_id: str) -> List[Dict[str, Any]]:
         slide_entries: List[Dict[str, Any]] = []
         for i, slide_text in enumerate(slides, start=1):
             top_text, bot_text = split_sentences(slide_text)
-            t_top = find_sentence_time(top_text, transcript)
-            t_bot = find_sentence_time(bot_text, transcript)
+            # Anchor to where each sentence is spoken, then pick the best-looking
+            # frame nearby (face visible, sharp) instead of the raw first frame.
+            t_top = pick_best_frame(src, find_sentence_time(top_text, transcript))
+            t_bot = pick_best_frame(src, find_sentence_time(bot_text, transcript))
             rel = f"carousel_{n}/slide_{i}.png"
             build_slide(src, t_top, t_bot, top_text, bot_text, cdir / f"slide_{i}.png")
             slide_entries.append(
@@ -234,15 +293,19 @@ def render_one_slide(
     bottom_text: str,
     t_top: float,
     t_bottom: float,
+    font_size: int = FONT_SIZE,
 ) -> Dict[str, Any]:
     """Re-render a single carousel slide with explicit text + timestamps, and
-    update the manifest. Returns the updated slide entry."""
+    update the manifest. Returns the updated slide entry.
+
+    User-supplied timestamps are respected exactly — no auto re-picking here,
+    so the -/+ frame nudges behave predictably."""
     src = source_path(job_id)
     if not src.exists():
         raise FileNotFoundError(f"source.mp4 not found for job {job_id}")
     cdir = job_dir(job_id) / "carousels" / f"carousel_{number}"
     out = cdir / f"slide_{index}.png"
-    build_slide(src, t_top, t_bottom, top_text, bottom_text, out)
+    build_slide(src, t_top, t_bottom, top_text, bottom_text, out, font_size)
 
     entry = {
         "index": index,

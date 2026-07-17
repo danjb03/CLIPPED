@@ -18,11 +18,12 @@ STAGES = ["Download", "Transcribe", "Select", "Render", "Copy"]
 @dataclass
 class Job:
     id: str
-    step: int = -1            # index into STAGES; -1 = not started
+    step: int = -1            # index into stages; -1 = not started
     state: str = "pending"    # pending | running | done | error
     stage: Optional[str] = None
     error: Optional[str] = None
     job_id: Optional[str] = None  # the worker job_id (output/<job_id>/)
+    stages: List[str] = field(default_factory=lambda: list(STAGES))
     started_at: float = field(default_factory=time.time)
     finished_at: Optional[float] = None
 
@@ -34,7 +35,7 @@ class Job:
             "stage": self.stage,
             "error": self.error,
             "job_id": self.job_id,
-            "stages": STAGES,
+            "stages": self.stages,
             "elapsed": round((self.finished_at or time.time()) - self.started_at, 1),
         }
 
@@ -69,7 +70,7 @@ def run_pipeline(
     steps: List[tuple[str, Callable[[Job], None]]],
 ) -> None:
     """Walk `steps` (label, fn) updating job state; capture errors and stop."""
-    update(run_id, state="running")
+    update(run_id, state="running", stages=[label for label, _ in steps])
     for i, (label, fn) in enumerate(steps):
         update(run_id, step=i, stage=label)
         try:

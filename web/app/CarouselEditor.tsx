@@ -51,6 +51,7 @@ function SlideCard({
   const [bottom, setBottom] = useState(slide.bottom_text);
   const [tTop, setTTop] = useState(slide.t_top);
   const [tBottom, setTBottom] = useState(slide.t_bottom);
+  const [fontSize, setFontSize] = useState(48);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [v, setV] = useState(Date.now());
@@ -73,6 +74,7 @@ function SlideCard({
         bottom_text: bottom.slice(0, MAX_CHARS),
         t_top: nt,
         t_bottom: nb,
+        font_size: fontSize,
       });
       setV(Date.now());
     } catch (e) {
@@ -118,6 +120,19 @@ function SlideCard({
           <span>bottom frame @ {tBottom.toFixed(1)}s</span>
           <button className="ghost sm" onClick={() => apply({ tBottom: Math.max(0, tBottom - 0.5) })} disabled={busy}>−</button>
           <button className="ghost sm" onClick={() => apply({ tBottom: tBottom + 0.5 })} disabled={busy}>+</button>
+        </div>
+
+        <div className="framerow">
+          <span>Text size</span>
+          <select
+            value={fontSize}
+            onChange={(e) => setFontSize(Number(e.target.value))}
+          >
+            <option value={40}>Small</option>
+            <option value={48}>Normal</option>
+            <option value={56}>Large</option>
+            <option value={66}>Extra large</option>
+          </select>
         </div>
 
         <div className="actionrow">

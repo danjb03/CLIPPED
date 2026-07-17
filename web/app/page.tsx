@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CarouselEditor } from "./CarouselEditor";
 import { ClipCard } from "./ClipCard";
 import {
@@ -11,44 +11,53 @@ import {
   getArtifact,
   getWorkerToken,
   getWorkerUrl,
+  ServerDraft,
   setWorkerToken,
   setWorkerUrl,
 } from "../lib/api";
-import {
-  Draft,
-  getDrafts,
-  removeDraft,
-  saveDraft,
-  updateDraft,
-} from "../lib/drafts";
 
 type WorkerStatus = "checking" | "online" | "offline";
 
-const STAGES = ["Download", "Transcribe", "Select", "Render", "Copy"];
+const DEFAULT_STAGES = ["Download", "Transcribe", "Storylines", "Slides"];
 
 function fmtBytes(n: number): string {
   return n >= 1e9 ? `${(n / 1e9).toFixed(2)}GB` : `${Math.round(n / 1e6)}MB`;
 }
 
+async function downloadBlob(url: string, name: string) {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`download ${res.status}`);
+  const blob = await res.blob();
+  const obj = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = obj;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(obj), 1000);
+}
+
 export default function Home() {
   const [worker, setWorker] = useState<WorkerStatus>("checking");
   const [url, setUrl] = useState("");
+  const [makeClips, setMakeClips] = useState(false);
   const [count, setCount] = useState(3);
   const [splitScreen, setSplitScreen] = useState(false);
+  const [creator, setCreator] = useState("");
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [clips, setClips] = useState<Clip[]>([]);
   const [carousels, setCarousels] = useState<CarouselManifest[]>([]);
   const [stage, setStage] = useState<string | null>(null);
+  const [stages, setStages] = useState<string[]>(DEFAULT_STAGES);
   const [err, setErr] = useState<string | null>(null);
-  const [exportHref, setExportHref] = useState<string | null>(null);
   const [workerInput, setWorkerInput] = useState("");
   const [tokenInput, setTokenInput] = useState("");
-  const [creator, setCreator] = useState("");
   const [step, setStep] = useState(-1);
-  const [drafts, setDrafts] = useState<Draft[]>([]);
-  // the source we can re-run from (last uploaded/processed job)
+  const [drafts, setDrafts] = useState<ServerDraft[]>([]);
   const [lastJobId, setLastJobId] = useState<string | null>(null);
+  const [zipBusy, setZipBusy] = useState(false);
 
   function checkHealth() {
     setWorker("checking");
@@ -58,24 +67,51 @@ export default function Home() {
       .catch(() => setWorker("offline"));
   }
 
+  const refreshDrafts = useCallback(() => {
+    api
+      .drafts()
+      .then((d) => setDrafts(d.drafts))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     setWorkerInput(getWorkerUrl());
     setTokenInput(getWorkerToken());
-    setDrafts(getDrafts());
     checkHealth();
-  }, []);
+    refreshDrafts();
+  }, [refreshDrafts]);
 
   function saveWorker() {
     setWorkerUrl(workerInput.trim());
     setWorkerToken(tokenInput.trim());
     checkHealth();
+    refreshDrafts();
   }
 
   const running = stage !== null;
 
-  async function pollRun(runId: string, name: string) {
-    // Poll the worker for status until done/error. The pipeline runs in the
-    // background on the worker, so the browser never holds a long request open.
+  async function loadResults(job: string, withClips: boolean) {
+    try {
+      const manifest = await getArtifact<CarouselManifest[]>(
+        job,
+        "carousels/manifest.json"
+      );
+      setCarousels(manifest);
+    } catch {
+      /* no carousels yet */
+    }
+    if (withClips) {
+      try {
+        setClips(await getArtifact<Clip[]>(job, "clips.json"));
+      } catch {
+        /* no clips */
+      }
+    }
+  }
+
+  async function pollRun(runId: string, withClips: boolean) {
+    // The pipeline runs in the background on the worker; we poll status so no
+    // request ever stays open long enough for a proxy to kill it.
     while (true) {
       let s;
       try {
@@ -84,37 +120,37 @@ export default function Home() {
         await new Promise((r) => setTimeout(r, 2000));
         continue;
       }
+      if (s.stages?.length) setStages(s.stages);
       setStep(s.step);
       setStage(s.stage ? `${s.stage}…` : null);
       if (s.job_id) {
         setJobId(s.job_id);
         setLastJobId(s.job_id);
-        // remember this source as a draft the moment we know its job_id
-        setDrafts(saveDraft({ jobId: s.job_id, name, createdAt: Date.now(), status: "uploaded" }));
       }
       if (s.state === "done") {
-        const loaded = await getArtifact<Clip[]>(s.job_id!, "clips.json");
-        setClips(loaded);
+        await loadResults(s.job_id!, withClips);
         setStep(s.stages.length);
         setStage(null);
-        if (s.job_id) setDrafts(updateDraft(s.job_id, { status: "done" }));
+        refreshDrafts();
         return;
       }
       if (s.state === "error") {
         setErr(s.error || "Pipeline failed");
         setStage(null);
-        if (s.job_id) setDrafts(updateDraft(s.job_id, { status: "error" }));
+        refreshDrafts();
         return;
       }
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
 
-  async function startRun(body: { url?: string; job_id?: string }, name: string) {
+  async function startRun(body: { url?: string; job_id?: string }) {
     setErr(null);
     setClips([]);
     setCarousels([]);
-    setExportHref(null);
+    setStages(
+      makeClips ? [...DEFAULT_STAGES, "Select", "Render", "Copy"] : DEFAULT_STAGES
+    );
     setStep(0);
     setStage("Starting…");
     if (body.job_id) setLastJobId(body.job_id);
@@ -123,20 +159,18 @@ export default function Home() {
         ...body,
         count,
         mode: splitScreen ? "split" : "single",
+        make_clips: makeClips,
+        creator: creator || null,
       });
-      await pollRun(run_id, name);
+      await pollRun(run_id, makeClips);
     } catch (e) {
       setErr(String(e));
       setStage(null);
     }
   }
 
-  function analyse() {
-    return startRun({ url }, url);
-  }
-
   function retry() {
-    if (lastJobId) startRun({ job_id: lastJobId }, lastJobId);
+    if (lastJobId) startRun({ job_id: lastJobId });
   }
 
   async function uploadFile(file: File) {
@@ -147,53 +181,78 @@ export default function Home() {
     setStage("Uploading 0%…");
     try {
       const { job_id } = await api.uploadProgress(file, (pct, loaded, total) => {
-        setStage(`Uploading ${Math.round(pct * 100)}% (${fmtBytes(loaded)} / ${fmtBytes(total)})`);
+        setStage(
+          `Uploading ${Math.round(pct * 100)}% (${fmtBytes(loaded)} / ${fmtBytes(total)})`
+        );
       });
-      setLastJobId(job_id);
-      setDrafts(saveDraft({ jobId: job_id, name: file.name, createdAt: Date.now(), status: "uploaded" }));
-      await startRun({ job_id }, file.name);
+      refreshDrafts();
+      await startRun({ job_id });
     } catch (e) {
       setErr(`Upload failed: ${e}`);
       setStage(null);
     }
   }
 
-  function resumeDraft(d: Draft) {
-    setUrl("");
-    startRun({ job_id: d.jobId }, d.name);
-  }
-
-  function deleteDraft(jobId: string) {
-    setDrafts(removeDraft(jobId));
-  }
-
-  async function makeCarousels() {
-    if (!jobId) return;
+  // Re-run just the carousel stages on an existing transcribed job.
+  async function regenerateCarousels(job: string) {
     setErr(null);
+    setCarousels([]);
+    setJobId(job);
+    setLastJobId(job);
+    setStages(["Storylines", "Slides"]);
+    setStep(0);
+    setStage("Starting…");
     try {
-      setStage("Generating carousels…");
-      await api.carousels(jobId, creator);
-      setStage("Building split-screen slides…");
-      const { carousels: manifest } = await api.renderCarousels(jobId);
-      setCarousels(manifest);
-      setStage(null);
+      const { run_id } = await api.carouselsRun(job, creator);
+      await pollRun(run_id, false);
     } catch (e) {
       setErr(String(e));
       setStage(null);
     }
   }
 
-  async function doExport() {
-    if (!jobId) return;
+  function resumeDraft(d: ServerDraft) {
+    setUrl("");
+    if (d.has_transcript) {
+      // Transcript already exists — skip straight to carousels (fast + cheap).
+      regenerateCarousels(d.job_id);
+    } else {
+      startRun({ job_id: d.job_id });
+    }
+  }
+
+  async function openDraft(d: ServerDraft) {
     setErr(null);
+    setJobId(d.job_id);
+    setLastJobId(d.job_id);
+    setClips([]);
+    setCarousels([]);
+    await loadResults(d.job_id, d.has_clips);
+  }
+
+  async function deleteDraftRow(job: string) {
     try {
-      setStage("Bundling export…");
-      await api.exportZip(jobId);
-      setExportHref(fileUrl(jobId, "export.zip"));
-      setStage(null);
+      await api.deleteDraft(job);
     } catch (e) {
       setErr(String(e));
-      setStage(null);
+    }
+    refreshDrafts();
+  }
+
+  async function downloadCarouselZip() {
+    if (!jobId) return;
+    setZipBusy(true);
+    setErr(null);
+    try {
+      await api.exportCarousels(jobId);
+      await downloadBlob(
+        `${fileUrl(jobId, "carousels.zip")}?t=${Date.now()}`,
+        "carousels.zip"
+      );
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setZipBusy(false);
     }
   }
 
@@ -213,58 +272,26 @@ export default function Home() {
 
       <section className="howto">
         <ol>
-          <li>Paste a video link (YouTube works best).</li>
-          <li>Choose how many clips you want.</li>
+          <li>Upload your podcast (or paste a link).</li>
           <li>
-            Hit <strong>Create clips</strong> — captions are added automatically.
+            Hit <strong>Create carousels</strong> — it transcribes, finds the most
+            viral storylines, and builds split-screen slides automatically.
           </li>
+          <li>Edit any slide’s text or frame, then download the PNGs.</li>
         </ol>
       </section>
 
       <section className="panel">
         <input
           className="url"
-          placeholder="Paste a video link…"
+          placeholder="Paste a video link (optional — uploading is more reliable)…"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           disabled={running}
         />
-        <div className="opts">
-          <label>
-            Posts (N)
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={count}
-              onChange={(e) => setCount(Number(e.target.value))}
-              disabled={running}
-            />
-          </label>
-          <label>
-            Format
-            <select disabled>
-              <option>9:16 (vertical)</option>
-            </select>
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={splitScreen}
-              onChange={(e) => setSplitScreen(e.target.checked)}
-              disabled={running}
-            />
-            Split-screen
-            <span className="hint">(Phase 4 — falls back to single crop for now)</span>
-          </label>
-        </div>
         <div className="createrow">
-          <button className="primary" onClick={analyse} disabled={running || !url}>
-            Create clips
-          </button>
-          <span className="or2">or</span>
-          <label className={`uploadbtn${running ? " disabled" : ""}`}>
-            Upload a video file
+          <label className={`uploadbtn primarylike${running ? " disabled" : ""}`}>
+            ⬆ Upload podcast &amp; create carousels
             <input
               type="file"
               accept="video/*,audio/*"
@@ -276,16 +303,68 @@ export default function Home() {
               }}
             />
           </label>
+          <span className="or2">or</span>
+          <button
+            className="primary"
+            onClick={() => startRun({ url })}
+            disabled={running || !url}
+          >
+            Create from link
+          </button>
         </div>
-        <p className="hint">
-          YouTube/Drive links are often blocked when downloaded from a server —
-          uploading the file always works.
-        </p>
+
+        <div className="opts">
+          <label className="creator">
+            Creator voice
+            <select
+              value={creator}
+              onChange={(e) => setCreator(e.target.value)}
+              disabled={running}
+            >
+              <option value="">Auto (most words)</option>
+              <option value="A">Speaker A</option>
+              <option value="B">Speaker B</option>
+            </select>
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={makeClips}
+              onChange={(e) => setMakeClips(e.target.checked)}
+              disabled={running}
+            />
+            Also make video clips
+          </label>
+          {makeClips ? (
+            <>
+              <label>
+                Clips (N)
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={count}
+                  onChange={(e) => setCount(Number(e.target.value))}
+                  disabled={running}
+                />
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={splitScreen}
+                  onChange={(e) => setSplitScreen(e.target.checked)}
+                  disabled={running}
+                />
+                Split-screen clips
+              </label>
+            </>
+          ) : null}
+        </div>
       </section>
 
       {step >= 0 ? (
         <ol className="stepper">
-          {STAGES.map((s, i) => (
+          {stages.map((s, i) => (
             <li
               key={s}
               className={
@@ -310,39 +389,32 @@ export default function Home() {
         </div>
       ) : null}
 
-      {clips.length > 0 ? (
+      {carousels.length > 0 && jobId ? (
         <>
           <div className="toolbar">
-            <label className="creator">
-              Creator
-              <select
-                value={creator}
-                onChange={(e) => setCreator(e.target.value)}
-                disabled={running}
-              >
-                <option value="">Auto</option>
-                <option value="A">Speaker A</option>
-                <option value="B">Speaker B</option>
-              </select>
-            </label>
-            <button onClick={makeCarousels} disabled={running}>
-              Generate carousels
+            <button onClick={downloadCarouselZip} disabled={running || zipBusy}>
+              {zipBusy ? "Zipping…" : "⬇ Download all carousels (.zip)"}
             </button>
-            <button onClick={doExport} disabled={running}>
-              Export .zip
+            <button
+              className="ghost"
+              onClick={() => regenerateCarousels(jobId)}
+              disabled={running}
+            >
+              ↻ Regenerate storylines
             </button>
-            {exportHref ? (
-              <a className="dl" href={exportHref}>
-                ⬇ Download export.zip
-              </a>
-            ) : null}
           </div>
+          <CarouselEditor jobId={jobId} carousels={carousels} />
+        </>
+      ) : null}
 
+      {clips.length > 0 && jobId ? (
+        <>
+          <h2>Video clips</h2>
           <div className="grid">
             {clips.map((clip, i) => (
               <ClipCard
                 key={i}
-                jobId={jobId!}
+                jobId={jobId}
                 index={i}
                 clip={clip}
                 mode={splitScreen ? "split" : "single"}
@@ -353,39 +425,38 @@ export default function Home() {
         </>
       ) : null}
 
-      {carousels.length > 0 && jobId ? (
-        <CarouselEditor jobId={jobId} carousels={carousels} />
-      ) : null}
-
       {drafts.length > 0 ? (
         <section className="drafts">
-          <h2>Drafts</h2>
+          <h2>Library</h2>
           <p className="hint">
-            Previously uploaded/processed sources. Re-run any of them without
-            re-uploading.
+            Every podcast you’ve uploaded, saved on the server — open results,
+            re-run, or delete from any device.
           </p>
           <ul className="draftlist">
             {drafts.map((d) => (
-              <li key={d.jobId} className="draftrow">
-                <span className={`ddot ${d.status ?? ""}`} />
+              <li key={d.job_id} className="draftrow">
+                <span
+                  className={`ddot ${d.has_carousels ? "done" : d.has_transcript ? "uploaded" : ""}`}
+                />
                 <span className="dname" title={d.name}>
-                  {d.name || d.jobId}
+                  {d.name || d.job_id}
                 </span>
                 <span className="dmeta">
-                  {new Date(d.createdAt).toLocaleString()}
+                  {new Date(d.created * 1000).toLocaleString()}
                 </span>
-                <button
-                  className="ghost"
-                  onClick={() => resumeDraft(d)}
-                  disabled={running}
-                >
-                  Create clips
+                {d.has_carousels ? (
+                  <button className="ghost" onClick={() => openDraft(d)} disabled={running}>
+                    Open
+                  </button>
+                ) : null}
+                <button className="ghost" onClick={() => resumeDraft(d)} disabled={running}>
+                  {d.has_transcript ? "New carousels" : "Process"}
                 </button>
                 <button
                   className="ghost del"
-                  onClick={() => deleteDraft(d.jobId)}
+                  onClick={() => deleteDraftRow(d.job_id)}
                   disabled={running}
-                  title="Remove from list"
+                  title="Delete from server (frees disk space)"
                 >
                   ✕
                 </button>
